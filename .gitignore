@@ -1,0 +1,47 @@
+# Secrets and credentials
+*.txt
+!docs/**/*.txt
+!prompts/**/*.txt
+.env
+.env.*
+*.pem
+*.key
+*-secret.json
+credentials.json
+Neo4j-*-Created-*.txt
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Databricks
+.databricks/
+.dbx/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

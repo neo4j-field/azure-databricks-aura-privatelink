@@ -54,12 +54,6 @@ variable "aura_pls_resource_id" {
   type        = string
 }
 
-variable "aura_group_id" {
-  description = "Group identifier for the Aura PLS. Aura exposes a single group; any non-empty string Databricks accepts works. Default: `neo4j`."
-  type        = string
-  default     = "neo4j"
-}
-
 variable "aura_private_hostname" {
   description = "Neo4j Aura Private URI hostname, e.g. b7253d3b.databases.neo4j.io. Used by NCC-managed DNS to route the hostname to the private endpoint."
   type        = string

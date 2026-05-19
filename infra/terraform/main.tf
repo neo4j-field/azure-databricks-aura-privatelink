@@ -41,8 +41,11 @@ resource "databricks_mws_ncc_private_endpoint_rule" "aura" {
   provider                       = databricks.account
   network_connectivity_config_id = databricks_mws_network_connectivity_config.ncc.network_connectivity_config_id
 
+  # For third-party Private Link Services (Neo4j Aura, Azure App Gateway v2, etc.)
+  # the provider expects `resource_id` (the PLS alias) plus `domain_names`. The
+  # `group_id` field is reserved for first-party Azure resources and is mutually
+  # exclusive with `domain_names`.
   resource_id  = var.aura_pls_resource_id
-  group_id     = var.aura_group_id
   domain_names = [var.aura_private_hostname]
 }
 

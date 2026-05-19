@@ -26,10 +26,8 @@ ncc_name = "ncc-aura-privatelink-uksouth"
 #   production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
 aura_pls_resource_id = "REPLACE_WITH_AURA_PLS_ALIAS"
 
-# `aura_group_id` is a logical group identifier. Aura uses a single group; the
-# value can be any non-empty string Databricks accepts. We default to `neo4j`.
-aura_group_id = "neo4j"
-
 # `aura_private_hostname` is the hostname your driver will connect to. Take
 # it from the Aura instance's Private URI (e.g., neo4j+s://<dbid>.databases.neo4j.io).
+# For third-party PLS the provider expects only `resource_id` + `domain_names`;
+# `group_id` is reserved for first-party Azure services and must not be set here.
 aura_private_hostname = "REPLACE_WITH_AURA_PRIVATE_HOSTNAME"            # e.g., b7253d3b.databases.neo4j.io

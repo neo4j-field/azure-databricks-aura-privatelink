@@ -16,20 +16,26 @@ variable "databricks_workspace_url" {
 }
 
 variable "azure_client_id" {
-  description = "Service principal client ID with account-admin role"
+  description = "Service principal client ID with Databricks account-admin role. Leave null to fall back to Azure CLI auth (`az login` as a user that is a Databricks account admin)."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_client_secret" {
-  description = "Service principal client secret"
+  description = "Service principal client secret. Leave null to fall back to Azure CLI auth."
   type        = string
   sensitive   = true
+  default     = null
+  nullable    = true
 }
 
 variable "azure_tenant_id" {
-  description = "Azure AD tenant ID"
+  description = "Azure AD tenant ID. Leave null to let the provider read it from the Azure CLI context."
   type        = string
+  default     = null
+  nullable    = true
 }
 
 variable "azure_region" {

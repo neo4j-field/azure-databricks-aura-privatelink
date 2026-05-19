@@ -9,8 +9,10 @@ variable "databricks_workspace_id" {
 }
 
 variable "databricks_workspace_url" {
-  description = "Azure Databricks workspace URL (https://adb-xxx.xx.azuredatabricks.net)"
+  description = "Azure Databricks workspace URL. Not consumed by this stack; kept for documentation and future workspace-level provider use (e.g., secret scope automation)."
   type        = string
+  default     = null
+  nullable    = true
 }
 
 variable "azure_client_id" {
@@ -31,13 +33,12 @@ variable "azure_tenant_id" {
 }
 
 variable "azure_region" {
-  description = "Azure region for NCC (must match workspace region)"
+  description = "Azure region for the NCC. Must match the Databricks workspace region exactly. Example: uksouth"
   type        = string
-  default     = "eastus"
 }
 
 variable "ncc_name" {
-  description = "Name for the Network Connectivity Configuration"
+  description = "Name for the Network Connectivity Configuration (lowercase, hyphen-delimited)."
   type        = string
   default     = "ncc-aura-privatelink"
 }
@@ -48,11 +49,12 @@ variable "aura_pls_resource_id" {
 }
 
 variable "aura_group_id" {
-  description = "Group identifier for the Aura PLS (provided by Aura)"
+  description = "Group identifier for the Aura PLS. Aura exposes a single group; any non-empty string Databricks accepts works. Default: `neo4j`."
   type        = string
+  default     = "neo4j"
 }
 
 variable "aura_private_hostname" {
-  description = "Neo4j Aura Private URI hostname, e.g. d48d6199.databases.neo4j.io"
+  description = "Neo4j Aura Private URI hostname, e.g. b7253d3b.databases.neo4j.io. Used by NCC-managed DNS to route the hostname to the private endpoint."
   type        = string
 }

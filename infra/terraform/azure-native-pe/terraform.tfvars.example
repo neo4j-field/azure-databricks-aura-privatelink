@@ -1,0 +1,28 @@
+# ----------------------------------------------------------------------------
+# Copy to terraform.tfvars (gitignored) and fill in real values before applying.
+# This stack is for customer-managed consumers (classic Databricks clusters,
+# AKS, ADF, jump VMs). For Databricks Serverless, use ../ (the NCC stack).
+# ----------------------------------------------------------------------------
+
+azure_subscription_id = "REPLACE_WITH_SUBSCRIPTION_ID"
+azure_tenant_id       = "REPLACE_WITH_TENANT_ID"
+
+resource_group_name       = "REPLACE_WITH_RG_NAME"          # e.g., rg-data-uksouth
+virtual_network_name      = "REPLACE_WITH_VNET_NAME"
+vnet_resource_group_name  = null                            # set only if VNet lives in a different RG
+pe_subnet_name            = "REPLACE_WITH_PE_SUBNET_NAME"   # e.g., snet-private-endpoints
+
+private_endpoint_name     = "pe-neo4j-aura-uksouth"
+
+aura_pls_alias            = "REPLACE_WITH_AURA_PLS_ALIAS"   # e.g., production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
+aura_instance_id          = "REPLACE_WITH_AURA_INSTANCE_ID" # e.g., b7253d3b
+
+manage_private_dns        = true
+
+connection_request_message = "Neo4j Aura PrivateLink from <team> / <subscription nickname>"
+
+tags = {
+  project    = "neo4j-aura-privatelink"
+  managed_by = "terraform"
+  owner      = "REPLACE_WITH_OWNER"
+}

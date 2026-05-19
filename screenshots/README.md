@@ -1,18 +1,23 @@
 # Screenshots
 
-This folder holds console screenshots that go with the steps in the top-level README.
+Console screenshots that go with the steps in the top-level README. Captured against the reference deployment: Aura instance `b7253d3b` (UK South), Databricks workspace `dbxuk-svrless-drose`.
 
-Add screenshots here as you walk through your own setup. Suggested set:
+| File | Step | What it shows |
+|------|------|---------------|
+| `01-aura-network-access-overview.png` | Step 2 | Aura *Network Access* page for the org. Confirms `uksouth` region has `Private traffic: Enabled` and `Public traffic: Disabled`. |
+| `02-aura-network-access-config-subscriptions.png` | Step 2 | Edit wizard *Step 1 of 4* — the Target Azure Subscription IDs registered for inbound PrivateLink. The Databricks subscription `70bb2c8c-6c76-47c0-b6c9-82f0204f30ac` must appear here. |
+| `03-aura-pls-service-name-and-instructions.png` | Step 2 | Edit wizard *Step 2 of 4* — the PLS service name (`production-orch-0477-service.<guid>.uksouth.azure.privatelinkservice`) and the Aura-provided portal instructions for creating a customer-managed PE. The Terraform stacks in `infra/terraform/` automate both paths. |
 
-| Filename | Step | What to capture |
-|----------|------|-----------------|
-| `01-aura-network-access-config.png` | Step 2 | Aura Network Access config wizard with Target Subscription IDs + Enable Private Link toggle |
-| `02-aura-pls-service-name.png` | Step 2 | The PLS alias as it appears in the Aura console |
-| `03-aura-private-uri.png` | Step 2 | Instance tile showing both Connection URI and Private URI |
-| `04-databricks-account-console-ncc.png` | Step 4 | NCC list page in the account console |
-| `05-databricks-ncc-detail.png` | Step 6 | NCC detail page showing the PE rule in PENDING / ESTABLISHED state |
-| `06-aura-approve-endpoint.png` | Step 7 | Aura approval screen for the incoming endpoint request |
-| `07-databricks-rule-established.png` | Step 7 | NCC view showing rule status ESTABLISHED |
-| `08-validation-notebook-success.png` | Step 8 | Notebook output showing private IP and successful Bolt connection |
+## Add your own
 
-Use PNG, keep file sizes under ~500KB per image. Redact any account/subscription IDs you don't want public.
+For each new deployment, capture additionally:
+
+| Suggested file | What to capture |
+|----------------|-----------------|
+| `04-databricks-account-console-ncc.png` | NCC list page in the Databricks account console |
+| `05-databricks-ncc-detail.png` | NCC detail with the PE rule (PENDING / ESTABLISHED) |
+| `06-aura-approve-endpoint.png` | Aura approval screen for the incoming endpoint request |
+| `07-databricks-rule-established.png` | NCC view showing rule status ESTABLISHED |
+| `08-validation-notebook-success.png` | `notebooks/03_dbxuk_svrless_drose_smoke_test.py` output |
+
+PNG only. Keep file sizes under ~500KB each. Redact any account IDs or subscription IDs you do not want in a public repo.

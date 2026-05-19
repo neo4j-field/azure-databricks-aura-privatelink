@@ -1,14 +1,35 @@
-databricks_account_id    = "c4548f31-5cc9-4fb9-b9ae-6f7c91bcb9e8"
-databricks_workspace_id  = "0000000000000000"
-databricks_workspace_url = "https://adb-0000000000000000.0.azuredatabricks.net"
+# ----------------------------------------------------------------------------
+# Copy to terraform.tfvars (gitignored) and fill in real values before applying.
+# ----------------------------------------------------------------------------
 
+# Databricks account / workspace
+databricks_account_id    = "REPLACE_WITH_DATABRICKS_ACCOUNT_ID"          # accounts.azuredatabricks.net -> User profile
+databricks_workspace_id  = "REPLACE_WITH_WORKSPACE_ID"                   # e.g., 7405607696817769 (numeric)
+databricks_workspace_url = "https://adb-REPLACE_ME.REPLACE_ME.azuredatabricks.net"
+
+# Service principal that is an Azure Databricks account admin.
+# Recommended: create a dedicated SP, grant account admin in Databricks, and
+# scope its Azure role to least privilege (no broad Contributor on the sub).
 azure_client_id     = "REPLACE_WITH_SP_CLIENT_ID"
 azure_client_secret = "REPLACE_WITH_SP_CLIENT_SECRET"
 azure_tenant_id     = "REPLACE_WITH_TENANT_ID"
 
-azure_region = "eastus"
-ncc_name     = "ncc-aura-privatelink"
+# Region: must match the Databricks workspace region exactly.
+# Example for this reference deployment: uksouth
+azure_region = "uksouth"
 
-aura_pls_resource_id  = "pls-aura-xxxx.guid.region.azure.privatelinkservice"
-aura_group_id         = "neo4j-aura"
-aura_private_hostname = "d48d6199.databases.neo4j.io"
+# Friendly NCC name (lowercase, hyphen-delimited).
+ncc_name = "ncc-aura-privatelink-uksouth"
+
+# Neo4j Aura Private Link Service details (from Aura console -> Network Access).
+# `aura_pls_resource_id` is the PLS alias surfaced in the Aura UI, e.g.:
+#   production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
+aura_pls_resource_id = "REPLACE_WITH_AURA_PLS_ALIAS"
+
+# `aura_group_id` is a logical group identifier. Aura uses a single group; the
+# value can be any non-empty string Databricks accepts. We default to `neo4j`.
+aura_group_id = "neo4j"
+
+# `aura_private_hostname` is the hostname your driver will connect to. Take
+# it from the Aura instance's Private URI (e.g., neo4j+s://<dbid>.databases.neo4j.io).
+aura_private_hostname = "REPLACE_WITH_AURA_PRIVATE_HOSTNAME"            # e.g., b7253d3b.databases.neo4j.io

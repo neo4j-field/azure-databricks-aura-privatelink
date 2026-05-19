@@ -4,6 +4,14 @@ Production-grade reference for establishing private, end-to-end connectivity bet
 
 This repository accompanies the architecture guide "Neo4j Aura PrivateLink + Azure Databricks Serverless" and provides the corrected, validated step-by-step setup along with notebooks, Terraform, and helper scripts.
 
+A worked reference deployment is included for:
+
+- Aura instance `b7253d3b` (`b7253d3b.databases.neo4j.io`), UK South
+- PLS alias `production-orch-0477-service.10388da2-e87f-4402-9140-b5ab816fc8d6.uksouth.azure.privatelinkservice`
+- Databricks workspace `dbxuk-svrless-drose` (`adb-7405607696817769.9.azuredatabricks.net`), serverless, UK South
+
+The Terraform under [`infra/terraform/`](infra/terraform/) covers the serverless NCC path; [`infra/terraform/azure-native-pe/`](infra/terraform/azure-native-pe/) covers the customer-managed PE path shown in the Aura console wizard. End-to-end validation runs via [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py).
+
 ---
 
 ## Problem Statement
@@ -88,6 +96,15 @@ See [docs/architecture.md](docs/architecture.md) for a detailed walkthrough incl
 | Region | Region that supports Private Link for your target resources |
 
 ---
+
+## Choose your Terraform stack
+
+| Consumer | Stack | Why |
+|---|---|---|
+| Azure Databricks Serverless (this repo's primary target) | [`infra/terraform/`](infra/terraform/) | Serverless compute lives in Databricks-managed subscriptions; the only supported private-network path is NCC + private endpoint rule. |
+| Classic Azure Databricks (VNet-injected), AKS, ADF self-hosted IR, jump VMs, Functions on VNet integration | [`infra/terraform/azure-native-pe/`](infra/terraform/azure-native-pe/) | Customer-managed Private Endpoint into Aura's PLS plus a `databases.neo4j.io` private DNS zone linked to your VNet. |
+
+The two stacks are independent. You can run only the NCC stack, only the Azure-native stack, or both side-by-side if different teams in the same subscription consume Aura over both surfaces.
 
 ## Setup Steps (Validated)
 
@@ -195,11 +212,11 @@ DNS resolution for the Aura Private URI is handled by Databricks NCC because you
 
 ```python
 import socket
-host = "d48d6199.databases.neo4j.io"
-print(socket.gethostbyname(host))   # should return a 10.x or similar private IP
+host = "b7253d3b.databases.neo4j.io"   # use your own Aura instance id
+print(socket.gethostbyname(host))      # should return a 10.x or similar private IP
 ```
 
-Then run the end-to-end validation notebook: [notebooks/01_validate_connectivity.py](notebooks/01_validate_connectivity.py).
+Then run the end-to-end validation notebook for the reference deployment: [notebooks/03_dbxuk_svrless_drose_smoke_test.py](notebooks/03_dbxuk_svrless_drose_smoke_test.py). For a generic version, use [notebooks/01_validate_connectivity.py](notebooks/01_validate_connectivity.py).
 
 ### Step 9: Disable Public Access on Aura (Recommended)
 
@@ -216,23 +233,26 @@ Once validation succeeds:
 
 ```
 .
-├── README.md                          # This file
-├── LICENSE                            # Apache 2.0
+├── README.md                                       # This file
+├── LICENSE                                         # Apache 2.0
 ├── docs/
-│   ├── architecture.md                # Detailed architecture and rationale
-│   ├── validation-report.md           # PDF-vs-docs validation findings
-│   └── troubleshooting.md             # Common issues and fixes
+│   ├── architecture.md                             # Detailed architecture and rationale
+│   ├── validation-report.md                        # PDF-vs-docs validation findings
+│   └── troubleshooting.md                          # Common issues and fixes
 ├── notebooks/
-│   ├── 01_validate_connectivity.py    # DNS + Bolt sanity check
-│   └── 02_delta_to_neo4j.py           # Round-trip: Delta -> Neo4j -> Delta
+│   ├── 01_validate_connectivity.py                 # Generic DNS + Bolt sanity check
+│   ├── 02_delta_to_neo4j.py                        # Round-trip: Delta -> Neo4j -> Delta
+│   └── 03_dbxuk_svrless_drose_smoke_test.py        # End-to-end PrivateLink smoke test for the reference deployment
 ├── infra/
-│   └── terraform/                     # NCC + PE rule provisioning
+│   └── terraform/
+│       ├── main.tf, variables.tf, ...              # Databricks NCC + PE rule + workspace binding (serverless path)
+│       └── azure-native-pe/                        # Customer-managed PE + private DNS (non-serverless path)
 ├── scripts/
-│   ├── create-secret-scope.sh         # Databricks secret scope setup
-│   ├── create-private-endpoint-rule.sh# REST API PE rule for Aura PLS
-│   └── validate-dns.py                # Standalone DNS check
-├── prompts/                           # Prompts used to build this repo
-└── screenshots/                       # Console screenshots (add yours)
+│   ├── create-secret-scope.sh                      # Databricks secret scope setup
+│   ├── create-private-endpoint-rule.sh             # REST API fallback for the NCC PE rule
+│   └── validate-dns.py                             # Standalone DNS check
+├── prompts/                                        # Prompts used to build this repo
+└── screenshots/                                    # Console screenshots from the reference deployment
 ```
 
 ---

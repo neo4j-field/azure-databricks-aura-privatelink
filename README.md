@@ -242,7 +242,8 @@ Once validation succeeds:
 ├── notebooks/
 │   ├── 01_validate_connectivity.py                 # Generic DNS + Bolt sanity check
 │   ├── 02_delta_to_neo4j.py                        # Round-trip: Delta -> Neo4j -> Delta
-│   └── 03_dbxuk_svrless_drose_smoke_test.py        # End-to-end PrivateLink smoke test for the reference deployment
+│   ├── 03_dbxuk_svrless_drose_smoke_test.py        # End-to-end PrivateLink smoke test for the reference deployment
+│   └── 04_serverless_push_pull_demo.py             # Small push/pull demo over PrivateLink (synthetic customers)
 ├── infra/
 │   └── terraform/
 │       ├── main.tf, variables.tf, ...              # Databricks NCC + PE rule + workspace binding (serverless path)

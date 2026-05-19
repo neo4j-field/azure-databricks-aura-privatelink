@@ -10,7 +10,12 @@ A worked reference deployment is included for:
 - PLS alias `production-orch-0477-service.10388da2-e87f-4402-9140-b5ab816fc8d6.uksouth.azure.privatelinkservice`
 - Databricks workspace `dbxuk-svrless-drose` (`adb-7405607696817769.9.azuredatabricks.net`), serverless, UK South
 
-The Terraform under [`infra/terraform/`](infra/terraform/) covers the serverless NCC path; [`infra/terraform/azure-native-pe/`](infra/terraform/azure-native-pe/) covers the customer-managed PE path shown in the Aura console wizard. End-to-end validation runs via [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py).
+The Terraform under [`infra/terraform/`](infra/terraform/) is split into two sibling stacks:
+
+- [`infra/terraform/databricks-ncc/`](infra/terraform/databricks-ncc/) — Databricks NCC + private endpoint rule + workspace binding (use this for serverless).
+- [`infra/terraform/azure-private-endpoint/`](infra/terraform/azure-private-endpoint/) — Customer-managed Azure Private Endpoint + private DNS zone (use this for classic Databricks, AKS, ADF, jump VMs).
+
+End-to-end validation for the serverless path runs via [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py).
 
 ---
 
@@ -101,8 +106,8 @@ See [docs/architecture.md](docs/architecture.md) for a detailed walkthrough incl
 
 | Consumer | Stack | Why |
 |---|---|---|
-| Azure Databricks Serverless (this repo's primary target) | [`infra/terraform/`](infra/terraform/) | Serverless compute lives in Databricks-managed subscriptions; the only supported private-network path is NCC + private endpoint rule. |
-| Classic Azure Databricks (VNet-injected), AKS, ADF self-hosted IR, jump VMs, Functions on VNet integration | [`infra/terraform/azure-native-pe/`](infra/terraform/azure-native-pe/) | Customer-managed Private Endpoint into Aura's PLS plus a `databases.neo4j.io` private DNS zone linked to your VNet. |
+| Azure Databricks Serverless (this repo's primary target) | [`infra/terraform/databricks-ncc/`](infra/terraform/databricks-ncc/) | Serverless compute lives in Databricks-managed subscriptions; the only supported private-network path is NCC + private endpoint rule. |
+| Classic Azure Databricks (VNet-injected), AKS, ADF self-hosted IR, jump VMs, Functions on VNet integration | [`infra/terraform/azure-private-endpoint/`](infra/terraform/azure-private-endpoint/) | Customer-managed Private Endpoint into Aura's PLS plus a `databases.neo4j.io` private DNS zone linked to your VNet. |
 
 The two stacks are independent. You can run only the NCC stack, only the Azure-native stack, or both side-by-side if different teams in the same subscription consume Aura over both surfaces.
 
@@ -246,8 +251,9 @@ Once validation succeeds:
 │   └── 04_serverless_push_pull_demo.py             # Small push/pull demo over PrivateLink (synthetic customers)
 ├── infra/
 │   └── terraform/
-│       ├── main.tf, variables.tf, ...              # Databricks NCC + PE rule + workspace binding (serverless path)
-│       └── azure-native-pe/                        # Customer-managed PE + private DNS (non-serverless path)
+│       ├── README.md                               # Index: which stack to pick
+│       ├── databricks-ncc/                         # Databricks NCC + PE rule + workspace binding (serverless path)
+│       └── azure-private-endpoint/                 # Customer-managed PE + private DNS (non-serverless path)
 ├── scripts/
 │   ├── create-secret-scope.sh                      # Databricks secret scope setup
 │   ├── create-private-endpoint-rule.sh             # REST API fallback for the NCC PE rule

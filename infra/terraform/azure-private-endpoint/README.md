@@ -10,7 +10,7 @@ Use this stack when your consumer is **not** Databricks Serverless. Typical fits
 - Jump VMs / Bastion-fronted admin hosts
 - Azure Functions on VNet integration
 
-For **Azure Databricks Serverless**, use the NCC stack in [`../`](..) instead. Serverless compute runs in Databricks-managed subscriptions and cannot consume a customer-VNet private endpoint.
+For **Azure Databricks Serverless**, use [`../databricks-ncc/`](../databricks-ncc/) instead. Serverless compute runs in Databricks-managed subscriptions and cannot consume a customer-VNet private endpoint.
 
 ## What this stack creates
 
@@ -31,7 +31,7 @@ For **Azure Databricks Serverless**, use the NCC stack in [`../`](..) instead. S
 ## Usage
 
 ```bash
-cd infra/terraform/azure-native-pe
+cd infra/terraform/azure-private-endpoint
 cp terraform.tfvars.example terraform.tfvars
 # Edit terraform.tfvars
 terraform init

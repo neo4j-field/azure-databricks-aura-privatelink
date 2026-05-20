@@ -17,6 +17,8 @@ The Terraform under [`infra/terraform/`](infra/terraform/) is split into two sib
 
 End-to-end validation for the serverless path runs via [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py).
 
+The customer-managed PE path has been validated end-to-end against this deployment from a Windows VM in East US connecting to UK South Aura. See [`screenshots/`](screenshots/) for the captured walkthrough — including the Aura-side approval, the `Disable public traffic` lockdown, the VM's `nslookup` resolving to the PE NIC, and a working Neo4j Browser session over the private path.
+
 ---
 
 ## Problem Statement

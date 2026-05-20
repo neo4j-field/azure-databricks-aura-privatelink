@@ -15,7 +15,7 @@ The Terraform under [`infra/terraform/`](infra/terraform/) is split into two sib
 - [`infra/terraform/databricks-ncc/`](infra/terraform/databricks-ncc/) — Databricks NCC + private endpoint rule + workspace binding (use this for serverless).
 - [`infra/terraform/azure-private-endpoint/`](infra/terraform/azure-private-endpoint/) — Customer-managed Azure Private Endpoint + private DNS zone (use this for classic Databricks, AKS, ADF, jump VMs).
 
-End-to-end validation for the serverless path runs via [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py).
+End-to-end validation for the serverless path runs via [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py). See [`screenshots/`](screenshots/) for both the customer-managed Azure Private Endpoint walkthrough and the Databricks NCC setup screens.
 
 The customer-managed PE path has been validated end-to-end against this deployment from a Windows VM in East US connecting to UK South Aura. See [`screenshots/`](screenshots/) for the captured walkthrough — including the Aura-side approval, the `Disable public traffic` lockdown, the VM's `nslookup` resolving to the PE NIC, and a working Neo4j Browser session over the private path.
 

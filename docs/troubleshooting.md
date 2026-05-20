@@ -26,9 +26,9 @@ Wait 5 minutes and restart serverless compute resources.
 ValueError: Cannot resolve address p-...neo4j.io:7687
 ```
 
-**Cause:** Aura VDC can return additional Bolt routing hostnames in the Neo4j routing table. NCC only routes hostnames listed in the private endpoint rule `domain_names`, so the initial Aura hostname works but the advertised routing hostname does not.
+**Cause:** Aura VDC can return additional Bolt routing hostnames in the Neo4j routing table. NCC routes the initial Aura hostname, but a `p-*.neo4j.io` routing hostname can still fail DNS resolution if it does not resolve publicly.
 
-**Fix:** Add the returned `p-*.neo4j.io` hostname to `aura_extra_domain_names` in the Terraform stack and apply. Then restart serverless compute and verify both hostnames resolve privately:
+**Fix:** First add the returned `p-*.neo4j.io` hostname to `aura_extra_domain_names` in the Terraform stack and apply. Then restart serverless compute and verify both hostnames resolve privately:
 
 ```python
 import socket, ipaddress
@@ -39,6 +39,26 @@ for host in [
 ]:
     ip = socket.gethostbyname(host)
     print(host, ip, ipaddress.ip_address(ip).is_private)
+```
+
+If the `p-*.neo4j.io` hostname still returns `Name or service not known`, keep using the `neo4j+s://` URI and add a Neo4j driver resolver that maps that routing hostname back to the private Aura hostname:
+
+```python
+from neo4j import GraphDatabase
+
+aura_host = "<dbid>.databases.neo4j.io"
+routing_aliases = {
+    "p-<dbid>-....neo4j.io": aura_host,
+}
+
+def aura_private_resolver(address):
+    return [(routing_aliases.get(address.host, address.host), address.port)]
+
+driver = GraphDatabase.driver(
+    f"neo4j+s://{aura_host}",
+    auth=(NEO4J_USER, NEO4J_PASSWORD),
+    resolver=aura_private_resolver,
+)
 ```
 
 ## NCC rule stuck in PENDING

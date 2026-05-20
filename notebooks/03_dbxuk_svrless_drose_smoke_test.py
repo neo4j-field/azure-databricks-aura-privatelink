@@ -99,9 +99,23 @@ from tenacity import (
     wait_exponential,
 )
 
+ROUTING_HOST_ALIASES = {
+    # Aura VDC can return p-*.neo4j.io addresses in the routing table. If those
+    # names do not resolve in Databricks serverless, map them to the private
+    # Aura hostname that NCC already resolves.
+    "p-b7253d3b-944d-0005.production-orch-0477.neo4j.io": EXPECTED_HOST,
+}
+
+def aura_private_resolver(address):
+    mapped_host = ROUTING_HOST_ALIASES.get(address.host, address.host)
+    if mapped_host != address.host:
+        print(f"Resolver alias: {address.host}:{address.port} -> {mapped_host}:{address.port}")
+    return [(mapped_host, address.port)]
+
 driver = GraphDatabase.driver(
     NEO4J_URI,
     auth=(NEO4J_USER, NEO4J_PASSWORD),
+    resolver=aura_private_resolver,
     connection_timeout=10,
     max_connection_lifetime=300,
 )

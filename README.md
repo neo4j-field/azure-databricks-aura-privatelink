@@ -130,7 +130,7 @@ In the Aura console:
 3. Configure:
    - **Product**: AuraDB VDC (matches your tier)
    - **Region**: same Azure region as your Aura instance
-   - **Target Azure Subscription IDs**: paste the subscription ID(s) where your Databricks workspace lives (e.g., `70bb2c8c-6c76-47c0-b6c9-82f0204f30ac`). **This is mandatory** — without it, the Aura console will not see incoming private endpoint requests.
+   - **Target Azure Subscription IDs**: for customer-managed Azure Private Endpoints, paste the subscription ID(s) where the private endpoint will be created. For Databricks Serverless NCC, the request comes from a **Databricks-managed Azure subscription**, not necessarily your workspace subscription; if the first NCC apply fails with a `ThirdPartyPrivateLinkService...DoesNotExistOrIsNotVisible` error, copy the subscription ID from that error into the Aura allow-list and retry. **This is mandatory** — without the right subscription, Aura will not see incoming private endpoint requests.
    - Toggle **Enable Private Link**
 4. Click **Save**
 5. Copy the **Private Link service name** (also called the PLS alias) — it looks like `pls-<id>.<guid>.<region>.azure.privatelinkservice`.
@@ -175,7 +175,7 @@ In the **Account Console** (`https://accounts.azuredatabricks.net/`), as **accou
 
 > **Important — must use REST API, not the account console UI.**
 >
-> The account console UI requires an Azure-native resource ID + subresource ID. Neo4j Aura is a **third-party Private Link Service** (similar to Azure App Gateway v2 in this regard), so the UI flow does not apply. You must use the Network Connectivity Configurations REST API with `resource_id` + `group_id` + `domain_names`.
+> The account console UI requires an Azure-native resource ID + subresource ID. Neo4j Aura is a **third-party/customer-managed Private Link Service**, so the UI flow does not apply. Use Terraform in `infra/terraform/databricks-ncc/` or the Network Connectivity Configurations REST API with the Aura PLS alias as `resource_id` and the Aura hostname in `domain_names`.
 
 See [scripts/create-private-endpoint-rule.sh](scripts/create-private-endpoint-rule.sh) for a ready-to-run script.
 
@@ -189,7 +189,6 @@ curl --location --request POST \
   --data @- <<EOF
 {
   "resource_id":  "${AURA_PLS_ALIAS}",
-  "group_id":     "${AURA_GROUP_ID}",
   "domain_names": ["${AURA_PRIVATE_HOSTNAME}"]
 }
 EOF
@@ -198,15 +197,16 @@ EOF
 Where:
 
 - `AURA_PLS_ALIAS` = the Private Link service name returned by the Aura console in Step 2
-- `AURA_GROUP_ID` = the group identifier provided by Aura alongside the PLS alias (typically the service name component)
 - `AURA_PRIVATE_HOSTNAME` = the Private URI hostname from Aura (e.g., `d48d6199.databases.neo4j.io`)
+
+For Aura VDC routing, the Neo4j driver can also receive `p-*.neo4j.io` Bolt addresses from the routing table. If a validation notebook fails with `Cannot resolve address p-...neo4j.io:7687`, add that hostname to the same private endpoint rule `domain_names` list. The Terraform stack exposes this as `aura_extra_domain_names`.
 
 After submission the rule will appear in the NCC with status `PENDING`.
 
 ### Step 7: Approve the Private Endpoint in the Aura Console
 
 1. Return to Aura → **Security → Network Access**
-2. Locate the incoming endpoint request from your Azure subscription
+2. Locate the incoming endpoint request from the Databricks-managed Azure subscription
 3. Click **Accept**
 4. Wait until status reads **Approved**
 5. In Databricks, refresh the NCC view — the rule status should transition to `ESTABLISHED`
@@ -221,6 +221,16 @@ DNS resolution for the Aura Private URI is handled by Databricks NCC because you
 import socket
 host = "b7253d3b.databases.neo4j.io"   # use your own Aura instance id
 print(socket.gethostbyname(host))      # should return a 10.x or similar private IP
+```
+
+If the Bolt validation reveals additional routing hostnames, verify them too:
+
+```python
+for host in [
+    "b7253d3b.databases.neo4j.io",
+    "p-b7253d3b-944d-0005.production-orch-0477.neo4j.io",
+]:
+    print(host, socket.gethostbyname(host))
 ```
 
 Then run the end-to-end validation notebook for the reference deployment: [notebooks/03_dbxuk_svrless_drose_smoke_test.py](notebooks/03_dbxuk_svrless_drose_smoke_test.py). For a generic version, use [notebooks/01_validate_connectivity.py](notebooks/01_validate_connectivity.py).

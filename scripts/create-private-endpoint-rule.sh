@@ -16,8 +16,9 @@
 #   export DATABRICKS_TOKEN=...
 #   export NCC_ID=...
 #   export AURA_PLS_ALIAS="pls-aura-xxx.guid.region.azure.privatelinkservice"
-#   export AURA_GROUP_ID="neo4j-aura"
 #   export AURA_PRIVATE_HOSTNAME="d48d6199.databases.neo4j.io"
+#   # Optional, comma-separated Neo4j routing hosts returned by the driver:
+#   export AURA_EXTRA_DOMAIN_NAMES="p-d48d6199-....neo4j.io"
 #   ./scripts/create-private-endpoint-rule.sh
 
 set -euo pipefail
@@ -26,7 +27,6 @@ set -euo pipefail
 : "${DATABRICKS_TOKEN:?Need DATABRICKS_TOKEN}"
 : "${NCC_ID:?Need NCC_ID}"
 : "${AURA_PLS_ALIAS:?Need AURA_PLS_ALIAS (PLS alias from Aura console)}"
-: "${AURA_GROUP_ID:?Need AURA_GROUP_ID (group identifier from Aura)}"
 : "${AURA_PRIVATE_HOSTNAME:?Need AURA_PRIVATE_HOSTNAME (Aura Private URI host)}"
 
 API_HOST="https://accounts.azuredatabricks.net"
@@ -34,22 +34,34 @@ API_HOST="https://accounts.azuredatabricks.net"
 echo "Submitting private endpoint rule..."
 echo "  NCC          : ${NCC_ID}"
 echo "  Resource ID  : ${AURA_PLS_ALIAS}"
-echo "  Group ID     : ${AURA_GROUP_ID}"
 echo "  Domain names : ${AURA_PRIVATE_HOSTNAME}"
+if [[ -n "${AURA_EXTRA_DOMAIN_NAMES:-}" ]]; then
+  echo "  Extra domains: ${AURA_EXTRA_DOMAIN_NAMES}"
+fi
 echo
+
+PAYLOAD=$(python3 - <<'PY'
+import json
+import os
+
+domains = [os.environ["AURA_PRIVATE_HOSTNAME"]]
+extra = os.environ.get("AURA_EXTRA_DOMAIN_NAMES", "")
+domains.extend(d.strip() for d in extra.split(",") if d.strip())
+domains = list(dict.fromkeys(domains))
+
+print(json.dumps({
+    "resource_id": os.environ["AURA_PLS_ALIAS"],
+    "domain_names": domains,
+}))
+PY
+)
 
 RESPONSE=$(curl --silent --show-error --fail \
   --request POST \
   "${API_HOST}/api/2.0/accounts/${DATABRICKS_ACCOUNT_ID}/network-connectivity-configs/${NCC_ID}/private-endpoint-rules" \
   --header "Authorization: Bearer ${DATABRICKS_TOKEN}" \
   --header "Content-Type: application/json" \
-  --data @- <<EOF
-{
-  "resource_id":  "${AURA_PLS_ALIAS}",
-  "group_id":     "${AURA_GROUP_ID}",
-  "domain_names": ["${AURA_PRIVATE_HOSTNAME}"]
-}
-EOF
+  --data "${PAYLOAD}"
 )
 
 echo "Response:"

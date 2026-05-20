@@ -22,7 +22,7 @@ The account console UI for private endpoint rules assumes an Azure-native resour
 
 Neo4j Aura is a **third-party Private Link Service**. The PLS lives in Aura's own managed subscription, not yours — you never see an ARM ID for it. You see a **PLS alias** instead, which is the canonical way Azure exposes PLS to consumers across subscription boundaries.
 
-Databricks' Network Connectivity API supports this case (the same way it supports Azure App Gateway v2): you pass `resource_id` (the alias or ARM ID Aura gave you), `group_id`, and `domain_names` (the hostname clients will resolve). The `domain_names` field is the key piece — it tells NCC's managed DNS to route that hostname to the private endpoint instead of the public Aura IP.
+Databricks' Network Connectivity API supports this case through the private endpoint rule payload: you pass `resource_id` (the PLS alias Aura gave you) and `domain_names` (the hostname clients will resolve). The `domain_names` field is the key piece — it tells NCC's managed DNS to route that hostname to the private endpoint instead of the public Aura IP.
 
 The UI flow does not expose `domain_names`, which is why third-party PLS routing requires the API.
 

@@ -18,20 +18,43 @@ curl --location --request PATCH \
 
 Wait 5 minutes and restart serverless compute resources.
 
+## Neo4j driver cannot resolve `p-*.neo4j.io`
+
+**Symptom:** DNS and TCP checks pass for `<dbid>.databases.neo4j.io`, but the Bolt query fails with:
+
+```
+ValueError: Cannot resolve address p-...neo4j.io:7687
+```
+
+**Cause:** Aura VDC can return additional Bolt routing hostnames in the Neo4j routing table. NCC only routes hostnames listed in the private endpoint rule `domain_names`, so the initial Aura hostname works but the advertised routing hostname does not.
+
+**Fix:** Add the returned `p-*.neo4j.io` hostname to `aura_extra_domain_names` in the Terraform stack and apply. Then restart serverless compute and verify both hostnames resolve privately:
+
+```python
+import socket, ipaddress
+
+for host in [
+    "<dbid>.databases.neo4j.io",
+    "p-<dbid>-....neo4j.io",
+]:
+    ip = socket.gethostbyname(host)
+    print(host, ip, ipaddress.ip_address(ip).is_private)
+```
+
 ## NCC rule stuck in PENDING
 
 **Symptom:** Rule status remains `PENDING` indefinitely.
 
 **Possible causes:**
 
-1. **Subscription not registered in Aura**: The target Azure subscription ID was not added to the Aura Network Access configuration.
+1. **Subscription not registered in Aura**: The Databricks-managed Azure subscription ID was not added to the Aura Network Access configuration.
 2. **Approval pending in Aura console**: The request is sitting unapproved in the Aura UI.
 3. **Wrong region**: NCC region does not match where the Aura PLS is exposed.
 
 **Diagnosis order:**
 
 1. Check Aura → Security → Network Access for an incoming request. Approve it if present.
-2. If no request appears, verify the subscription ID in the Aura Network Access config matches the subscription holding the Databricks workspace.
+2. If no request appears, verify the subscription ID in the Aura Network Access config matches the Databricks-managed subscription shown in the Terraform/Azure error path. Databricks may use more than one managed subscription per region, so repeat this for each new `/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...` value exposed by retries.
 3. Verify regions align.
 
 **Note:** Rules in `PENDING` for 14 days **expire** automatically. If you suspect this happened, recreate the rule.

@@ -58,3 +58,9 @@ variable "aura_private_hostname" {
   description = "Neo4j Aura Private URI hostname, e.g. b7253d3b.databases.neo4j.io. Used by NCC-managed DNS to route the hostname to the private endpoint."
   type        = string
 }
+
+variable "aura_extra_domain_names" {
+  description = "Additional Neo4j hostnames returned by the driver routing table that must resolve through NCC-managed DNS."
+  type        = list(string)
+  default     = []
+}

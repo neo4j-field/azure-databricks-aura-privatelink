@@ -17,6 +17,7 @@ Neo4j-*-Created-*.txt
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+tfplan*
 crash.log
 crash.*.log
 

@@ -46,7 +46,7 @@ resource "databricks_mws_ncc_private_endpoint_rule" "aura" {
   # `group_id` field is reserved for first-party Azure resources and is mutually
   # exclusive with `domain_names`.
   resource_id  = var.aura_pls_resource_id
-  domain_names = [var.aura_private_hostname]
+  domain_names = distinct(concat([var.aura_private_hostname], var.aura_extra_domain_names))
 }
 
 # ----------------------------------------------------------------------------

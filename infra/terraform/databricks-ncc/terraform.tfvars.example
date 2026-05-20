@@ -50,3 +50,8 @@ aura_pls_resource_id = "REPLACE_WITH_AURA_PLS_ALIAS"
 # expects only `resource_id` + `domain_names`; `group_id` is reserved for
 # first-party Azure services and must not be set here.
 aura_private_hostname = "REPLACE_WITH_AURA_PRIVATE_HOSTNAME"   # e.g., b7253d3b.databases.neo4j.io
+
+# Optional: add any hostnames returned by the Neo4j driver routing table. Aura
+# VDC can advertise p-*.neo4j.io Bolt addresses that the client also needs to
+# resolve privately through NCC.
+aura_extra_domain_names = []

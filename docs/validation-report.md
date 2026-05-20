@@ -31,7 +31,7 @@ Reconciliation of the original PDF guide "Neo4j Aura PrivateLink + Azure Databri
 
 **Missing in PDF:**
 
-1. **Target Azure Subscription ID registration** in Aura Network Access config. Without this, Azure-side PE requests never surface in the Aura console for approval.
+1. **Target Azure Subscription ID registration** in Aura Network Access config. For Databricks Serverless NCC, the private endpoint request comes from a Databricks-managed Azure subscription; without that subscription on Aura's allow-list, the PE request never surfaces for approval.
 2. **Region-scoped, not instance-scoped**: enabling Private Link applies to all instances in the region under the tenant.
 3. **Private URI vs Connection URI**: each instance gets a separate Private URI after Private Link is enabled.
 4. **Exact console path**: Security → Network Access → Network Access → New network access configuration.
@@ -61,8 +61,7 @@ The official Databricks NCC UI for private endpoint rules expects an **Azure-nat
 
 **Correct path:** Use the Network Connectivity Configurations REST API (same path used for Azure App Gateway v2), passing:
 
-- `resource_id` — the PLS alias or ARM ID from Aura
-- `group_id` — the group identifier from Aura
+- `resource_id` — the PLS alias from Aura
 - `domain_names` — array containing the Aura Private URI hostname
 
 Without `domain_names`, NCC's managed DNS will not route the Aura hostname to the private endpoint. The UI does not expose `domain_names`.
@@ -98,4 +97,4 @@ Aura falls under the Databricks "Resources behind a Standard Load Balancer" supp
 1. **Azure Databricks networking costs** — serverless egress to customer resources is billed.
 2. **June 9, 2026 deadline** for Azure storage allowlists to migrate to Network Security Perimeter with the `AzureDatabricksServerless` service tag.
 3. **Production retry/idempotency example** — the PDF recommends these but the code sample does not show them.
-4. **Bolt routing on VDC clusters** — for multi-instance VDC, routing URIs returned in cluster topology must also resolve via the private DNS path. For single-region VDC this generally works because routing URIs share the same hostname, but worth noting.
+4. **Bolt routing on VDC clusters** — routing URIs returned in cluster topology can include `p-*.neo4j.io` hostnames. These must be added to NCC `domain_names` alongside `<dbid>.databases.neo4j.io`; otherwise the first DNS/TCP checks pass but the driver fails with `Cannot resolve address p-...neo4j.io:7687`.

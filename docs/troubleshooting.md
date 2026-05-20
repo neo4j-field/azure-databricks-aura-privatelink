@@ -45,14 +45,14 @@ If the `p-*.neo4j.io` hostname still returns `Name or service not known`, keep u
 
 ```python
 from neo4j import GraphDatabase
+import re
 
 aura_host = "<dbid>.databases.neo4j.io"
-routing_aliases = {
-    "p-<dbid>-....neo4j.io": aura_host,
-}
+routing_host_pattern = re.compile(r"^p-<dbid>-[^.]+\.production-orch-<id>\.neo4j\.io$")
 
 def aura_private_resolver(address):
-    return [(routing_aliases.get(address.host, address.host), address.port)]
+    mapped_host = aura_host if routing_host_pattern.match(address.host) else address.host
+    return [(mapped_host, address.port)]
 
 driver = GraphDatabase.driver(
     f"neo4j+s://{aura_host}",

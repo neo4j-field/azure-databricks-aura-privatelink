@@ -1,24 +1,36 @@
 # ----------------------------------------------------------------------------
 # Copy to terraform.tfvars (gitignored) and fill in real values before applying.
 # This stack is for customer-managed consumers (classic Databricks clusters,
-# AKS, ADF, jump VMs). For Databricks Serverless, use ../ (the NCC stack).
+# AKS, ADF, jump VMs). For Databricks Serverless, use ../databricks-ncc/.
 # ----------------------------------------------------------------------------
 
 azure_subscription_id = "REPLACE_WITH_SUBSCRIPTION_ID"
 azure_tenant_id       = "REPLACE_WITH_TENANT_ID"
 
-resource_group_name       = "REPLACE_WITH_RG_NAME"          # e.g., rg-data-uksouth
-virtual_network_name      = "REPLACE_WITH_VNET_NAME"
-vnet_resource_group_name  = null                            # set only if VNet lives in a different RG
-pe_subnet_name            = "REPLACE_WITH_PE_SUBNET_NAME"   # e.g., snet-private-endpoints
+# Existing networking that will host the PE NIC. The PE must live in the same
+# region as this VNet; the target PLS can be in any region (cross-region PLS
+# consumption is supported).
+resource_group_name      = "REPLACE_WITH_RG_NAME"             # e.g., rg-data-eastus
+virtual_network_name     = "REPLACE_WITH_VNET_NAME"
+vnet_resource_group_name = null                                # set only if the VNet is in a different RG
+pe_subnet_name           = "REPLACE_WITH_PE_SUBNET_NAME"      # e.g., snet-private-endpoints
 
-private_endpoint_name     = "pe-neo4j-aura-uksouth"
+# Name of the PE resource itself. Recommended pattern:
+#   pe-<aura-instance-id>-<pe-region>     e.g. pe-b7253d3b-eastus
+# It is a hint, not enforced. Keep it lowercase and hyphen-delimited.
+private_endpoint_name = "REPLACE_WITH_PE_NAME"
 
-aura_pls_alias            = "REPLACE_WITH_AURA_PLS_ALIAS"   # e.g., production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
-aura_instance_id          = "REPLACE_WITH_AURA_INSTANCE_ID" # e.g., b7253d3b
+# Aura targets — from Aura console -> Security -> Network Access.
+aura_pls_alias   = "REPLACE_WITH_AURA_PLS_ALIAS"              # e.g., production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
+aura_instance_id = "REPLACE_WITH_AURA_INSTANCE_ID"            # the dbid, e.g., b7253d3b
 
-manage_private_dns        = true
+# Create the `databases.neo4j.io` private DNS zone + VNet link + A record in
+# this stack. Set to false if you manage DNS centrally (e.g., hub-and-spoke
+# Azure Private DNS Resolver) and want to wire the zone yourself.
+manage_private_dns = true
 
+# Shown on the Aura approval screen — make it identifying so the Aura admin
+# can match the request to your team.
 connection_request_message = "Neo4j Aura PrivateLink from <team> / <subscription nickname>"
 
 tags = {

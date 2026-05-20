@@ -1,33 +1,52 @@
 # ----------------------------------------------------------------------------
 # Copy to terraform.tfvars (gitignored) and fill in real values before applying.
+# This stack is for Azure Databricks Serverless. For customer-managed PE flows
+# (classic clusters, AKS, ADF, jump VMs), use ../azure-private-endpoint/.
 # ----------------------------------------------------------------------------
 
-# Databricks account / workspace
-databricks_account_id    = "REPLACE_WITH_DATABRICKS_ACCOUNT_ID"          # accounts.azuredatabricks.net -> User profile
-databricks_workspace_id  = "REPLACE_WITH_WORKSPACE_ID"                   # e.g., 7405607696817769 (numeric)
+# ---- Databricks account / workspace ----------------------------------------
+# Find your account_id at https://accounts.azuredatabricks.net (top-right user
+# menu shows it once you're signed in as an account admin).
+databricks_account_id    = "REPLACE_WITH_DATABRICKS_ACCOUNT_ID"
+
+# Workspace numeric ID (from the workspace URL between `adb-` and `.<digit>`)
+# and the full workspace URL.
+databricks_workspace_id  = "REPLACE_WITH_WORKSPACE_ID"
 databricks_workspace_url = "https://adb-REPLACE_ME.REPLACE_ME.azuredatabricks.net"
 
-# Service principal that is an Azure Databricks account admin.
-# Recommended: create a dedicated SP, grant account admin in Databricks, and
-# scope its Azure role to least privilege (no broad Contributor on the sub).
-azure_client_id     = "REPLACE_WITH_SP_CLIENT_ID"
-azure_client_secret = "REPLACE_WITH_SP_CLIENT_SECRET"
-azure_tenant_id     = "REPLACE_WITH_TENANT_ID"
+# ---- Auth (pick ONE path) ---------------------------------------------------
+#
+# Path A: Azure CLI (recommended for a one-off bootstrap)
+#   1. az login --tenant <tenant-id>
+#   2. Ensure the signed-in user is a Databricks account admin
+#      (accounts.azuredatabricks.net -> User management -> Admins)
+#   3. Leave the three azure_* lines below commented out.
+#
+# Path B: Service principal (recommended for CI/CD)
+#   1. Create an SP in Azure AD, grant it account-admin in the Databricks
+#      Account Console -> User management -> Service principals.
+#   2. Uncomment and fill in the three lines below.
+#
+# azure_client_id     = "REPLACE_WITH_SP_CLIENT_ID"
+# azure_client_secret = "REPLACE_WITH_SP_CLIENT_SECRET"
+# azure_tenant_id     = "REPLACE_WITH_TENANT_ID"
 
-# Region: must match the Databricks workspace region exactly.
-# Example for this reference deployment: uksouth
-azure_region = "uksouth"
+# ---- Region & naming --------------------------------------------------------
+# Must match the Databricks workspace region exactly (e.g., uksouth, eastus2).
+azure_region = "REPLACE_WITH_WORKSPACE_REGION"
 
-# Friendly NCC name (lowercase, hyphen-delimited).
-ncc_name = "ncc-aura-privatelink-uksouth"
+# Friendly NCC name (lowercase, hyphen-delimited). Recommended pattern:
+#   ncc-aura-privatelink-<region>
+ncc_name = "REPLACE_WITH_NCC_NAME"
 
-# Neo4j Aura Private Link Service details (from Aura console -> Network Access).
+# ---- Neo4j Aura PLS targets (from Aura console -> Network Access) ----------
 # `aura_pls_resource_id` is the PLS alias surfaced in the Aura UI, e.g.:
 #   production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
 aura_pls_resource_id = "REPLACE_WITH_AURA_PLS_ALIAS"
 
-# `aura_private_hostname` is the hostname your driver will connect to. Take
-# it from the Aura instance's Private URI (e.g., neo4j+s://<dbid>.databases.neo4j.io).
-# For third-party PLS the provider expects only `resource_id` + `domain_names`;
-# `group_id` is reserved for first-party Azure services and must not be set here.
-aura_private_hostname = "REPLACE_WITH_AURA_PRIVATE_HOSTNAME"            # e.g., b7253d3b.databases.neo4j.io
+# `aura_private_hostname` is the hostname your driver will connect to.
+# Take it from the Aura instance's Connection URI (e.g.,
+# neo4j+s://<dbid>.databases.neo4j.io). For third-party PLS the provider
+# expects only `resource_id` + `domain_names`; `group_id` is reserved for
+# first-party Azure services and must not be set here.
+aura_private_hostname = "REPLACE_WITH_AURA_PRIVATE_HOSTNAME"   # e.g., b7253d3b.databases.neo4j.io

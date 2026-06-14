@@ -246,6 +246,18 @@ Once validation succeeds:
 
 ---
 
+## What's next: access after public traffic is disabled
+
+Once public access is off, two categories of access break that the initial setup
+does not cover. Both have dedicated guides:
+
+| Scenario | Guide |
+|----------|-------|
+| **Developer on a laptop** needs Neo4j Desktop or a browser to reach the private instance | [`docs/developer-desktop-access.md`](docs/developer-desktop-access.md) — Azure Bastion (Option A) or Azure P2S VPN with OpenVPN (Option B, recommended for regulated industries) |
+| **Batch jobs, pipelines, or services** running in a different VNet or subscription fail to reach Aura | [`docs/batch-jobs-other-vnets.md`](docs/batch-jobs-other-vnets.md) — Private DNS Zone VNet links and VNet peering (same subscription) or a new Private Endpoint (cross-subscription) |
+
+---
+
 ## Repository Layout
 
 ```
@@ -255,7 +267,9 @@ Once validation succeeds:
 ├── docs/
 │   ├── architecture.md                             # Detailed architecture and rationale
 │   ├── validation-report.md                        # PDF-vs-docs validation findings
-│   └── troubleshooting.md                          # Common issues and fixes
+│   ├── troubleshooting.md                          # Common issues and fixes
+│   ├── developer-desktop-access.md                 # Neo4j Desktop / browser access after public traffic disabled
+│   └── batch-jobs-other-vnets.md                   # Private Link connectivity for workloads in other VNets
 ├── notebooks/
 │   ├── 01_validate_connectivity.py                 # Generic DNS + Bolt sanity check
 │   ├── 02_delta_to_neo4j.py                        # Round-trip: Delta -> Neo4j -> Delta
@@ -265,7 +279,8 @@ Once validation succeeds:
 │   └── terraform/
 │       ├── README.md                               # Index: which stack to pick
 │       ├── databricks-ncc/                         # Databricks NCC + PE rule + workspace binding (serverless path)
-│       └── azure-private-endpoint/                 # Customer-managed PE + private DNS (non-serverless path)
+│       ├── azure-private-endpoint/                 # Customer-managed PE + private DNS (non-serverless path)
+│       └── jumpbox/                                # Azure Bastion + jump box VM for developer desktop access
 ├── scripts/
 │   ├── create-secret-scope.sh                      # Databricks secret scope setup
 │   ├── create-private-endpoint-rule.sh             # REST API fallback for the NCC PE rule

@@ -2,22 +2,22 @@
 
 ---
 
-## Start here: use what your organisation already uses
+## Start here: use what your organization already uses
 
 Before reading the rest of this guide, ask your network, infrastructure, or
 security team one question:
 
 > **"How do developers in other teams access private resources in Azure today?"**
 
-Most organisations that run workloads in Azure already have an approved, audited
+Most organizations that run workloads in Azure already have an approved, audited
 method for private access — a corporate VPN, a jump host pattern, an Azure Bastion
 policy, or a Point-to-Site VPN that developers use to reach internal databases,
 Key Vault, or private APIs. If that method exists, use it. Connect Neo4j Desktop
 or your browser the same way those teams connect to their private Azure resources.
 There is no need to introduce new tooling, and doing so may conflict with your
-organisation's security policy or approved-software list.
+organization's security policy or approved-software list.
 
-Common patterns already in use at organisations that run Azure:
+Common patterns already in use at organizations that run Azure:
 
 | If your teams currently use… | Do the same for Neo4j |
 |------------------------------|-----------------------|
@@ -27,7 +27,7 @@ Common patterns already in use at organisations that run Azure:
 | ExpressRoute or Site-to-Site VPN from your office or data centre | The Neo4j Private Endpoint is reachable from any machine whose traffic routes through the connected VNet |
 | Nothing yet — this is the first private Azure workload | Use Option B (Azure P2S VPN with OpenVPN) — it is Azure-native, integrates with Azure AD + MFA, and is widely accepted in regulated industries |
 
-Only continue to the options below if your organisation does not already have a
+Only continue to the options below if your organization does not already have a
 standard method, or if your security team has asked you to evaluate one of the
 documented patterns.
 

@@ -1,13 +1,35 @@
 # Developer Desktop Access After Disabling Public Traffic
 
-Once you toggle **Disable public access** in the Aura console, connections from
-developer laptops — Neo4j Desktop, a browser pointed at Neo4j Browser, or any
-local driver script — are refused. The Aura Private Link endpoint lives inside
-your Azure VNet and the Private DNS Zone that resolves the Aura hostname to the
-endpoint NIC is only linked to that VNet. Laptops use public DNS, receive Aura's
-public IP, and get rejected.
+---
 
-This guide shows two options to restore that access without re-enabling public traffic.
+## Start here: use what your organisation already uses
+
+Before reading the rest of this guide, ask your network, infrastructure, or
+security team one question:
+
+> **"How do developers in other teams access private resources in Azure today?"**
+
+Most organisations that run workloads in Azure already have an approved, audited
+method for private access — a corporate VPN, a jump host pattern, an Azure Bastion
+policy, or a Point-to-Site VPN that developers use to reach internal databases,
+Key Vault, or private APIs. If that method exists, use it. Connect Neo4j Desktop
+or your browser the same way those teams connect to their private Azure resources.
+There is no need to introduce new tooling, and doing so may conflict with your
+organisation's security policy or approved-software list.
+
+Common patterns already in use at organisations that run Azure:
+
+| If your teams currently use… | Do the same for Neo4j |
+|------------------------------|-----------------------|
+| A corporate VPN (Cisco AnyConnect, Palo Alto GlobalProtect, Zscaler, etc.) that gives access to Azure private resources | Connect via the same VPN — once on it, Neo4j Desktop connects to the private URI directly |
+| Azure Point-to-Site VPN (OpenVPN or IKEv2) | Use the same VPN connection — link the existing Private DNS Zone to your VNet if not already done |
+| Azure Bastion to access jump box VMs | Use the same Bastion setup with SSH port-forwarding (same pattern as Option A below) |
+| ExpressRoute or Site-to-Site VPN from your office or data centre | The Neo4j Private Endpoint is reachable from any machine whose traffic routes through the connected VNet |
+| Nothing yet — this is the first private Azure workload | Use Option B (Azure P2S VPN with OpenVPN) — it is Azure-native, integrates with Azure AD + MFA, and is widely accepted in regulated industries |
+
+Only continue to the options below if your organisation does not already have a
+standard method, or if your security team has asked you to evaluate one of the
+documented patterns.
 
 ---
 

@@ -7,15 +7,17 @@ This repository accompanies the architecture guide "Neo4j Aura PrivateLink + Azu
 A worked reference deployment is included for:
 
 - Aura instance `b7253d3b` (`b7253d3b.databases.neo4j.io`), UK South
-- PLS alias `production-orch-0477-service.10388da2-e87f-4402-9140-b5ab816fc8d6.uksouth.azure.privatelinkservice`
-- Databricks workspace `dbxuk-svrless-drose` (`adb-7405607696817769.9.azuredatabricks.net`), serverless, UK South
+- PLS alias `production-orch-0477-service.<guid>.uksouth.azure.privatelinkservice` (the exact alias lives in `infra/terraform/databricks-ncc/terraform.tfvars`; confirm it against the Aura console at deploy time)
+- Databricks workspace `partner-demo-workspace-v2` (`adb-1098933906466604.4.azuredatabricks.net`), serverless, East US
+
+The workspace is in East US and the Aura instance is in UK South, so the NCC and its private endpoint sit in East US and reach the UK South Aura PLS cross-region.
 
 The Terraform under [`infra/terraform/`](infra/terraform/) is split into two sibling stacks:
 
 - [`infra/terraform/databricks-ncc/`](infra/terraform/databricks-ncc/) — Databricks NCC + private endpoint rule + workspace binding (use this for serverless).
 - [`infra/terraform/azure-private-endpoint/`](infra/terraform/azure-private-endpoint/) — Customer-managed Azure Private Endpoint + private DNS zone (use this for classic Databricks, AKS, ADF, jump VMs).
 
-End-to-end validation for the serverless path runs via [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py). See [`screenshots/`](screenshots/) for both the customer-managed Azure Private Endpoint walkthrough and the Databricks NCC setup screens.
+End-to-end validation for the serverless path runs via [`notebooks/01_validate_connectivity.py`](notebooks/01_validate_connectivity.py), the deployment-agnostic check that `scripts/automate.py` runs by default. [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py) is the original branded worked example, kept for reference. See [`screenshots/`](screenshots/) for both the customer-managed Azure Private Endpoint walkthrough and the Databricks NCC setup screens.
 
 The customer-managed PE path has been validated end-to-end against this deployment from a Windows VM in East US connecting to UK South Aura. See [`screenshots/`](screenshots/) for the captured walkthrough — including the Aura-side approval, the `Disable public traffic` lockdown, the VM's `nslookup` resolving to the PE NIC, and a working Neo4j Browser session over the private path.
 

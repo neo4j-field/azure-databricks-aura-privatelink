@@ -77,7 +77,12 @@ from neo4j import GraphDatabase
 from neo4j.exceptions import ServiceUnavailable, TransientError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-ROUTING_HOST_PATTERN = re.compile(r"^p-b7253d3b-[^.]+\.production-orch-0477\.neo4j\.io$")
+# Derive the routing-host pattern from the connection URI (populated from the
+# `neo4j` secret scope / .env), so this notebook follows the configured Aura
+# instance instead of a pinned dbid. Aura VDC advertises routing hosts shaped
+# like p-<dbid>-<suffix>.<orch>.neo4j.io; the dbid is the first label of the host.
+dbid = host.split(".")[0]
+ROUTING_HOST_PATTERN = re.compile(rf"^p-{re.escape(dbid)}-.*\.neo4j\.io$")
 
 def aura_private_resolver(address):
     # Aura VDC can return p-*.neo4j.io addresses in the routing table. If those

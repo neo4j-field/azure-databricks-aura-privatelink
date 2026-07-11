@@ -7,15 +7,17 @@ This repository accompanies the architecture guide "Neo4j Aura PrivateLink + Azu
 A worked reference deployment is included for:
 
 - Aura instance `b7253d3b` (`b7253d3b.databases.neo4j.io`), UK South
-- PLS alias `production-orch-0477-service.10388da2-e87f-4402-9140-b5ab816fc8d6.uksouth.azure.privatelinkservice`
-- Databricks workspace `dbxuk-svrless-drose` (`adb-7405607696817769.9.azuredatabricks.net`), serverless, UK South
+- PLS alias `production-orch-0477-service.<guid>.uksouth.azure.privatelinkservice` (the exact alias lives in `infra/terraform/databricks-ncc/terraform.tfvars`; confirm it against the Aura console at deploy time)
+- Databricks workspace `partner-demo-workspace-v2` (`adb-1098933906466604.4.azuredatabricks.net`), serverless, East US
+
+The workspace is in East US and the Aura instance is in UK South, so the NCC and its private endpoint sit in East US and reach the UK South Aura PLS cross-region.
 
 The Terraform under [`infra/terraform/`](infra/terraform/) is split into two sibling stacks:
 
 - [`infra/terraform/databricks-ncc/`](infra/terraform/databricks-ncc/) — Databricks NCC + private endpoint rule + workspace binding (use this for serverless).
 - [`infra/terraform/azure-private-endpoint/`](infra/terraform/azure-private-endpoint/) — Customer-managed Azure Private Endpoint + private DNS zone (use this for classic Databricks, AKS, ADF, jump VMs).
 
-End-to-end validation for the serverless path runs via [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py). See [`screenshots/`](screenshots/) for both the customer-managed Azure Private Endpoint walkthrough and the Databricks NCC setup screens.
+End-to-end validation for the serverless path runs via [`notebooks/01_validate_connectivity.py`](notebooks/01_validate_connectivity.py), the deployment-agnostic check that `scripts/automate.py` runs by default. [`notebooks/03_dbxuk_svrless_drose_smoke_test.py`](notebooks/03_dbxuk_svrless_drose_smoke_test.py) is the original branded worked example, kept for reference. See [`screenshots/`](screenshots/) for both the customer-managed Azure Private Endpoint walkthrough and the Databricks NCC setup screens.
 
 The customer-managed PE path has been validated end-to-end against this deployment from a Windows VM in East US connecting to UK South Aura. See [`screenshots/`](screenshots/) for the captured walkthrough — including the Aura-side approval, the `Disable public traffic` lockdown, the VM's `nslookup` resolving to the PE NIC, and a working Neo4j Browser session over the private path.
 
@@ -112,6 +114,31 @@ See [docs/architecture.md](docs/architecture.md) for a detailed walkthrough incl
 | Classic Azure Databricks (VNet-injected), AKS, ADF self-hosted IR, jump VMs, Functions on VNet integration | [`infra/terraform/azure-private-endpoint/`](infra/terraform/azure-private-endpoint/) | Customer-managed Private Endpoint into Aura's PLS plus a `databases.neo4j.io` private DNS zone linked to your VNet. |
 
 The two stacks are independent. You can run only the NCC stack, only the Azure-native stack, or both side-by-side if different teams in the same subscription consume Aura over both surfaces.
+
+### Decide who owns DNS (customer-managed stack only)
+
+On the customer-managed (`azure-private-endpoint/`) stack, decide **who owns DNS for `databases.neo4j.io`** before you apply. Serverless (NCC) has no such choice — NCC owns DNS entirely — so this applies only to the customer-managed path:
+
+- **Self-managed (single VNet):** the default (`manage_private_dns = true`). The stack creates the `databases.neo4j.io` private DNS zone, links it to your VNet, and writes the Aura A record. Nothing else to wire.
+- **Central / hub-and-spoke:** set `manage_private_dns = false` when your organization manages private DNS centrally — a hub VNet holds the zones (often behind Azure DNS Private Resolver) and spokes consume them over peering and zone links. The stack then provisions the Private Endpoint only; you add the A record plus the `p-*` routing-host records in your hub zone.
+
+See the [private-DNS section of the azure-private-endpoint README](infra/terraform/azure-private-endpoint/README.md#private-dns-self-managed-vs-central-hub-and-spoke) for the exact steps and [docs/architecture.md](docs/architecture.md#dns-ownership-who-answers-for-the-aura-hostname) for the rationale.
+
+Once you have picked a stack, see [Setup: automated or manual](#setup-automated-or-manual) to choose how to run it.
+
+## Setup: automated or manual
+
+Two Aura-console actions have no API and stay manual either way: adding the Databricks-managed subscription to Aura's allow-list (Step 2) and approving the private endpoint (Step 7). Everything else can be scripted.
+
+**Automated (recommended for the Serverless / NCC demo).** `scripts/automate.py` drives the Databricks side end to end: it runs Terraform, polls the endpoint rule to ESTABLISHED, restarts warehouses, loads the `neo4j` secret scope, and runs the validation notebook. It is re-entrant and pauses only for the two Aura actions above.
+
+```bash
+uv run scripts/automate.py run --account-profile <name>
+```
+
+See [AUTOMATE-README.md](AUTOMATE-README.md) for the full flow. To remove the Databricks side afterward, see [Teardown](#teardown).
+
+**Manual / step-by-step.** Follow Steps 1-9 below. Use this to understand each step, or when you are on the Azure-native stack (`azure-private-endpoint/`), which the orchestrator does not cover.
 
 ## Setup Steps (Validated)
 
@@ -258,6 +285,72 @@ does not cover. Both have dedicated guides:
 
 ---
 
+## Teardown
+
+Removing the Databricks side is mostly `terraform destroy` on the `databricks-ncc` stack, plus one manual step that has no clean automation and two Aura-console actions that have no API.
+
+**The NCC gotcha.** `terraform destroy` deletes the private endpoint rule and the workspace binding, but it **cannot delete the NCC itself**. The NCC is attached to the workspace through the workspace's own `network_connectivity_config_id`, and the Databricks account API has no way to *unset* an NCC on a workspace — it can only be **swapped for a different one**. So destroy fails on the final resource with:
+
+```
+cannot delete mws network connectivity config: ... unable to be deleted because
+it is attached to one or more workspaces: <workspace-id>
+```
+
+That error is expected. To finish teardown, reassign the workspace to a throwaway placeholder NCC, then delete the original.
+
+### Step 1: Destroy the stack
+
+```bash
+terraform -chdir=infra/terraform/databricks-ncc destroy
+```
+
+This removes the private endpoint rule and the workspace binding, then fails on the NCC with the message above. Note the NCC id (also available via `terraform -chdir=infra/terraform/databricks-ncc output ncc_id`).
+
+### Step 2: Detach the NCC by swapping in a placeholder
+
+The workspace must always point at *some* NCC, so free the original by pointing the workspace at an empty placeholder instead. The placeholder's region **must match the workspace region** — an NCC only binds to a workspace in its own region.
+
+**Account console:** Workspaces → your workspace → **Update workspace** → under **Network connectivity configurations** pick a different NCC (create an empty one first if you have none) → **Update**.
+
+**REST API** (mirrors Step 6; `ACCOUNT_ID`, `WORKSPACE_ID`, and a `DATABRICKS_TOKEN` bearer for `accounts.azuredatabricks.net`):
+
+```bash
+BASE="https://accounts.azuredatabricks.net/api/2.0/accounts/${ACCOUNT_ID}"
+
+# a. Create an empty placeholder NCC in the workspace's region.
+PLACEHOLDER=$(curl -s -X POST "${BASE}/network-connectivity-configs" \
+  -H "Authorization: Bearer ${DATABRICKS_TOKEN}" -H "Content-Type: application/json" \
+  --data '{"name":"ncc-placeholder","region":"eastus"}' \
+  | python3 -c 'import sys, json; print(json.load(sys.stdin)["network_connectivity_config_id"])')
+
+# b. Swap the workspace onto the placeholder — this frees the original NCC.
+curl -s -X PATCH "${BASE}/workspaces/${WORKSPACE_ID}" \
+  -H "Authorization: Bearer ${DATABRICKS_TOKEN}" -H "Content-Type: application/json" \
+  --data "{\"network_connectivity_config_id\": \"${PLACEHOLDER}\"}"
+```
+
+### Step 3: Delete the original NCC and reconcile Terraform
+
+```bash
+# ORIGINAL_NCC_ID is the NCC id from Step 1.
+curl -s -X DELETE "${BASE}/network-connectivity-configs/${ORIGINAL_NCC_ID}" \
+  -H "Authorization: Bearer ${DATABRICKS_TOKEN}"
+
+terraform -chdir=infra/terraform/databricks-ncc state rm \
+  databricks_mws_network_connectivity_config.ncc
+```
+
+The `state rm` drops the already-deleted NCC from Terraform state so the stack reads clean. The placeholder NCC stays attached to the workspace; it is empty and harmless — leave it or delete it later from the console.
+
+### Step 4: Aura-side cleanup (manual, no API)
+
+1. Aura console → **Security → Network Access**: remove the now-orphaned private endpoint approval.
+2. Optionally remove the Databricks-managed subscription from **Target Azure Subscription IDs** if nothing else uses it.
+
+The `neo4j` secret scope and the imported validation notebook remain in the workspace; delete them by hand for a full reset.
+
+---
+
 ## Repository Layout
 
 ```
@@ -313,6 +406,7 @@ does not cover. Both have dedicated guides:
 | 14-day expiry on unapproved rules | Approve promptly in Aura console |
 | 10-minute NCC propagation after attach | Wait, then restart serverless services |
 | Aura Private Link is region-scoped, not instance-scoped | Plan multi-region setups accordingly |
+| Customer-managed PE in a central-DNS (hub-and-spoke) org: a self-created zone collides with the hub or is blocked by Azure Policy | Set `manage_private_dns = false`; add the A record + routing-host records in the hub zone |
 
 ---
 

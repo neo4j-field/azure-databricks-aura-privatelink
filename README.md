@@ -115,6 +115,31 @@ See [docs/architecture.md](docs/architecture.md) for a detailed walkthrough incl
 
 The two stacks are independent. You can run only the NCC stack, only the Azure-native stack, or both side-by-side if different teams in the same subscription consume Aura over both surfaces.
 
+### Decide who owns DNS (customer-managed stack only)
+
+On the customer-managed (`azure-private-endpoint/`) stack, decide **who owns DNS for `databases.neo4j.io`** before you apply. Serverless (NCC) has no such choice — NCC owns DNS entirely — so this applies only to the customer-managed path:
+
+- **Self-managed (single VNet):** the default (`manage_private_dns = true`). The stack creates the `databases.neo4j.io` private DNS zone, links it to your VNet, and writes the Aura A record. Nothing else to wire.
+- **Central / hub-and-spoke:** set `manage_private_dns = false` when your organization manages private DNS centrally — a hub VNet holds the zones (often behind Azure DNS Private Resolver) and spokes consume them over peering and zone links. The stack then provisions the Private Endpoint only; you add the A record plus the `p-*` routing-host records in your hub zone.
+
+See the [private-DNS section of the azure-private-endpoint README](infra/terraform/azure-private-endpoint/README.md#private-dns-self-managed-vs-central-hub-and-spoke) for the exact steps and [docs/architecture.md](docs/architecture.md#dns-ownership-who-answers-for-the-aura-hostname) for the rationale.
+
+Once you have picked a stack, see [Setup: automated or manual](#setup-automated-or-manual) to choose how to run it.
+
+## Setup: automated or manual
+
+Two Aura-console actions have no API and stay manual either way: adding the Databricks-managed subscription to Aura's allow-list (Step 2) and approving the private endpoint (Step 7). Everything else can be scripted.
+
+**Automated (recommended for the Serverless / NCC demo).** `scripts/automate.py` drives the Databricks side end to end: it runs Terraform, polls the endpoint rule to ESTABLISHED, restarts warehouses, loads the `neo4j` secret scope, and runs the validation notebook. It is re-entrant and pauses only for the two Aura actions above.
+
+```bash
+uv run scripts/automate.py run --account-profile <name>
+```
+
+See [AUTOMATE-README.md](AUTOMATE-README.md) for the full flow, and `uv run scripts/automate.py teardown` to remove the Databricks side afterward.
+
+**Manual / step-by-step.** Follow Steps 1-9 below. Use this to understand each step, or when you are on the Azure-native stack (`azure-private-endpoint/`), which the orchestrator does not cover.
+
 ## Setup Steps (Validated)
 
 ### Step 1: Provision Neo4j Aura VDC on Azure
@@ -315,6 +340,7 @@ does not cover. Both have dedicated guides:
 | 14-day expiry on unapproved rules | Approve promptly in Aura console |
 | 10-minute NCC propagation after attach | Wait, then restart serverless services |
 | Aura Private Link is region-scoped, not instance-scoped | Plan multi-region setups accordingly |
+| Customer-managed PE in a central-DNS (hub-and-spoke) org: a self-created zone collides with the hub or is blocked by Azure Policy | Set `manage_private_dns = false`; add the A record + routing-host records in the hub zone |
 
 ---
 

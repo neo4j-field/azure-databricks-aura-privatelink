@@ -8,6 +8,8 @@ Reconciliation of the original PDF guide "Neo4j Aura PrivateLink + Azure Databri
 - Microsoft Learn — [Configure private connectivity to Azure resources (Databricks NCC)](https://learn.microsoft.com/en-us/azure/databricks/security/network/serverless-network-security/serverless-private-link)
 - Microsoft Learn — [Serverless compute plane networking](https://learn.microsoft.com/en-us/azure/databricks/security/network/serverless-network-security/)
 - Microsoft Learn — [Manage private endpoint rules](https://learn.microsoft.com/en-us/azure/databricks/security/network/serverless-network-security/manage-private-endpoint-rules)
+- Microsoft Learn — [Private Link and DNS integration at scale (hub-and-spoke)](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/private-link-and-dns-integration-at-scale)
+- Microsoft Learn — [Azure DNS Private Resolver](https://learn.microsoft.com/en-us/azure/dns/dns-private-resolver-overview)
 
 ## Summary
 
@@ -79,6 +81,10 @@ Aura falls under the Databricks "Resources behind a Standard Load Balancer" supp
 - For Azure-native services, NCC creates managed Private DNS zones automatically.
 - For third-party PLS (Aura), DNS routing depends on the `domain_names` field in the PE rule. Without it, DNS resolves to public IP and traffic does not use the private endpoint.
 - The Aura docs mention "configure Azure Private DNS within your VNet" — this guidance applies to classic Databricks compute with a customer VNet, not Serverless. Serverless has no customer VNet, so the DNS responsibility shifts entirely to NCC.
+- **Customer-managed PE path has two valid DNS topologies**, and the PDF assumes only the first:
+  - *Self-managed (single VNet):* the consumer creates a `databases.neo4j.io` private DNS zone, links it to the VNet, and adds the Aura A record. This is the `azure-private-endpoint` stack's default (`manage_private_dns = true`).
+  - *Central / hub-and-spoke:* a shared hub VNet owns the private DNS zones (frequently behind Azure DNS Private Resolver) and spokes consume them via peering and zone links. This is Microsoft's recommended enterprise pattern (see [Private Link and DNS integration at scale](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/private-link-and-dns-integration-at-scale)). Here the stack must **not** create its own zone — a duplicate zone in a spoke causes split-brain resolution, and many tenants block spoke-level zone creation via Azure Policy. Set `manage_private_dns = false` so only the Private Endpoint is created, then add the A record (pointing at the PE NIC IP) and the `p-*` routing-host records in the hub zone.
+  - The `p-<dbid>-...neo4j.io` routing hostnames (see item 4 below) must also be present in whichever zone owns the hostname, in both topologies.
 
 ### Step 7 — Validation
 

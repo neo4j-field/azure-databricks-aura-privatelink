@@ -36,8 +36,9 @@ Real environment variables, if set, take precedence over the .env file.
 Usage:
   cd <repo-root>
   uv run scripts/automate.py run --account-profile <name> [--workspace-profile azure-rk-knight]
+  uv run scripts/automate.py teardown [--yes]
 
-Flags:
+`run` flags:
   --no-apply                Skip `terraform apply`; only read `terraform output -json`.
   --notebook PATH           Validation notebook (default: notebooks/01_validate_connectivity.py).
   --poll-timeout N          Seconds to wait for the rule to reach ESTABLISHED (default: 600).
@@ -45,6 +46,9 @@ Flags:
   --run-timeout N           Minutes to wait for the validation run to finish (default: 30).
   --skip-warehouse-restart  Do not stop/start running SQL warehouses.
   --reset-secret-scope      Delete the `neo4j` secret scope before recreating it.
+
+`teardown` flags:
+  --yes                     Skip the confirmation prompt (for headless / CI use).
 """
 
 from __future__ import annotations
@@ -519,6 +523,41 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_teardown(args: argparse.Namespace) -> int:
+    banner("Teardown: destroy the databricks-ncc Terraform stack")
+    info("This removes the NCC, the Aura private endpoint rule, and the workspace binding.")
+    info(f"Stack: {TERRAFORM_DIR}")
+    if not args.yes:
+        try:
+            reply = input("\n  Run `terraform destroy` on this stack? [y/N] ").strip().lower()
+        except EOFError:
+            reply = ""
+        if reply not in {"y", "yes"}:
+            info("Aborted. Nothing was destroyed.")
+            return 0
+
+    init = _terraform(["init", "-input=false", "-no-color"], capture=True)
+    if init.returncode != 0:
+        raise SetupError(f"terraform init failed:\n{init.stdout}\n{init.stderr}")
+
+    destroy = _terraform(["destroy", "-input=false", "-no-color", "-auto-approve"])
+    if destroy.returncode != 0:
+        raise SetupError("terraform destroy failed. See the output above.")
+
+    banner("Teardown complete - Databricks side removed")
+    print(
+        "The Databricks NCC, private endpoint rule, and workspace binding are gone.\n"
+        "Two Aura-side items have no API and remain for you to clean up manually:\n"
+        "  1. Aura console -> Network Access: remove the now-orphaned private endpoint\n"
+        "     approval.\n"
+        "  2. Aura console -> Network Access: optionally remove the Databricks-managed\n"
+        "     subscription from 'Target Azure Subscription IDs' if no longer needed.\n"
+        "The 'neo4j' secret scope and the imported validation notebook are left in the\n"
+        "workspace; delete them by hand if you want a full reset.\n"
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="automate.py",
@@ -565,6 +604,17 @@ def build_parser() -> argparse.ArgumentParser:
         "scope holding another instance's credentials).",
     )
     run.set_defaults(func=cmd_run)
+
+    teardown = sub.add_parser(
+        "teardown",
+        help="Destroy the databricks-ncc Terraform stack (NCC, PE rule, binding).",
+    )
+    teardown.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the confirmation prompt (for headless / CI use).",
+    )
+    teardown.set_defaults(func=cmd_teardown)
     return parser
 
 

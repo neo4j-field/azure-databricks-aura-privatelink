@@ -51,6 +51,25 @@ When a notebook executes `socket.gethostbyname("d48d6199.databases.neo4j.io")`:
 
 The TLS certificate is issued for the real Aura hostname, so no certificate-trust manipulation is needed on the client side.
 
+## DNS ownership: who answers for the Aura hostname
+
+The DNS flow above assumes *something* maps `<aura-instance-id>.databases.neo4j.io` to a private IP. Which "something" that is depends on the compute path, and this is the single most common source of "the PE is approved but nothing connects" confusion.
+
+- **Serverless (NCC path).** DNS is not yours to manage. NCC holds a managed private-DNS layer inside the serverless compute plane, and the `domain_names` on the private endpoint rule is what populates it. There is no zone for you to create or link — see [the NCC stack](../infra/terraform/databricks-ncc/).
+
+- **Customer-managed PE path.** DNS *is* yours. A Private Endpoint only allocates a private IP on a NIC; it does not make the hostname resolve. You need an Azure **private DNS zone** for `databases.neo4j.io` holding an A record for the instance host, plus a virtual-network link so resolvers in the consuming VNet see it. Without the A record the zone is empty and the hostname silently falls back to public resolution — the connection may still work, but it is not private.
+
+For the customer-managed path there are two topologies, and the distinction matters because it changes *who* creates the zone:
+
+| Topology | Who owns `databases.neo4j.io` | Terraform setting |
+|---|---|---|
+| **Self-managed (single VNet)** | This stack, in your resource group | `manage_private_dns = true` (default) |
+| **Central / hub-and-spoke** | A shared hub VNet (often behind Azure DNS Private Resolver); spokes consume it via peering + zone links | `manage_private_dns = false` — you add the A record and link in the hub |
+
+Enterprises almost always centralize DNS: the hub owns every private zone and spokes are forbidden (by convention or Azure Policy) from creating their own. If this stack created a second `databases.neo4j.io` zone inside a spoke, resolution goes split-brain (two zones, one name, winner decided by which zone a VNet is linked to) or the apply is denied by policy. So `manage_private_dns = false` is the "defer to central DNS" switch: it provisions the PE only and hands DNS back to the platform team, who add the A record (pointing at the PE NIC IP) and the routing-host records in the hub zone.
+
+The [Aura routing-hostname](troubleshooting.md) caveat applies to **both** topologies: Aura advertises `p-<dbid>-...neo4j.io` routing addresses after the first connection, and those must resolve to the same private IP. On the NCC path they go in `aura_extra_domain_names`; on the customer-managed path they become additional A records (or a `p-*` wildcard) in whichever zone owns the hostname. Setup and worked steps for the central-DNS case live in the [azure-private-endpoint README](../infra/terraform/azure-private-endpoint/README.md#private-dns-self-managed-vs-central-hub-and-spoke).
+
 ## Supported resource categories in Databricks NCC
 
 As of May 2026, Databricks NCC private endpoints support these categories on Azure:

@@ -20,9 +20,9 @@ An NCC is an **account-level, region-scoped** object that:
 
 The account console UI for private endpoint rules assumes an Azure-native resource: it asks for a Destination Azure resource ID (ARM ID) and a sub-resource ID (group ID). This works for first-party Azure services (Storage, Key Vault, SQL, etc.) where Microsoft publishes a known list of sub-resource types.
 
-Neo4j Aura is a **third-party Private Link Service**. The PLS lives in Aura's own managed subscription, not yours — you never see an ARM ID for it. You see a **PLS alias** instead, which is the canonical way Azure exposes PLS to consumers across subscription boundaries.
+Neo4j Aura is a **third-party Private Link Service**. The PLS lives in Aura's own managed subscription, not yours. You never see an ARM ID for it. You see a **PLS alias** instead, which is the canonical way Azure exposes PLS to consumers across subscription boundaries.
 
-Databricks' Network Connectivity API supports this case through the private endpoint rule payload: you pass `resource_id` (the PLS alias Aura gave you) and `domain_names` (the hostname clients will resolve). The `domain_names` field is the key piece — it tells NCC's managed DNS to route that hostname to the private endpoint instead of the public Aura IP.
+Databricks' Network Connectivity API supports this case through the private endpoint rule payload: you pass `resource_id` (the PLS alias Aura gave you) and `domain_names` (the hostname clients will resolve). The `domain_names` field is the key piece: it tells NCC's managed DNS to route that hostname to the private endpoint instead of the public Aura IP.
 
 The UI flow does not expose `domain_names`, which is why third-party PLS routing requires the API.
 
@@ -33,7 +33,7 @@ Azure Databricks has two network planes that often get conflated:
 | Plane | What flows through it | How it reaches resources |
 |-------|----------------------|--------------------------|
 | **Control plane** | Cluster orchestration, workspace UI, metadata | Always over Azure backbone, managed by Databricks |
-| **Serverless compute plane (data plane)** | Notebook/job/SQL compute, customer queries | Configurable via NCC — uses private endpoints when defined |
+| **Serverless compute plane (data plane)** | Notebook/job/SQL compute, customer queries | Configurable via NCC: uses private endpoints when defined |
 
 This guide configures the **serverless compute plane** to reach Aura privately. The control plane is already private and not part of this setup.
 
@@ -55,16 +55,16 @@ The TLS certificate is issued for the real Aura hostname, so no certificate-trus
 
 The DNS flow above assumes *something* maps `<aura-instance-id>.databases.neo4j.io` to a private IP. Which "something" that is depends on the compute path, and this is the single most common source of "the PE is approved but nothing connects" confusion.
 
-- **Serverless (NCC path).** DNS is not yours to manage. NCC holds a managed private-DNS layer inside the serverless compute plane, and the `domain_names` on the private endpoint rule is what populates it. There is no zone for you to create or link — see [the NCC stack](../infra/terraform/databricks-ncc/).
+- **Serverless (NCC path).** DNS is not yours to manage. NCC holds a managed private-DNS layer inside the serverless compute plane, and the `domain_names` on the private endpoint rule is what populates it. There is no zone for you to create or link. See [the NCC stack](../infra/terraform/databricks-ncc/).
 
-- **Customer-managed PE path.** DNS *is* yours. A Private Endpoint only allocates a private IP on a NIC; it does not make the hostname resolve. You need an Azure **private DNS zone** for `databases.neo4j.io` holding an A record for the instance host, plus a virtual-network link so resolvers in the consuming VNet see it. Without the A record the zone is empty and the hostname silently falls back to public resolution — the connection may still work, but it is not private.
+- **Customer-managed PE path.** DNS *is* yours. A Private Endpoint only allocates a private IP on a NIC; it does not make the hostname resolve. You need an Azure **private DNS zone** for `databases.neo4j.io` holding an A record for the instance host, plus a virtual-network link so resolvers in the consuming VNet see it. Without the A record the zone is empty and the hostname silently falls back to public resolution; the connection may still work, but it is not private.
 
 For the customer-managed path there are two topologies, and the distinction matters because it changes *who* creates the zone:
 
 | Topology | Who owns `databases.neo4j.io` | Terraform setting |
 |---|---|---|
 | **Self-managed (single VNet)** | This stack, in your resource group | `manage_private_dns = true` (default) |
-| **Central / hub-and-spoke** | A shared hub VNet (often behind Azure DNS Private Resolver); spokes consume it via peering + zone links | `manage_private_dns = false` — you add the A record and link in the hub |
+| **Central / hub-and-spoke** | A shared hub VNet (often behind Azure DNS Private Resolver); spokes consume it via peering + zone links | `manage_private_dns = false`: you add the A record and link in the hub |
 
 Enterprises almost always centralize DNS: the hub owns every private zone and spokes are forbidden (by convention or Azure Policy) from creating their own. If this stack created a second `databases.neo4j.io` zone inside a spoke, resolution goes split-brain (two zones, one name, winner decided by which zone a VNet is linked to) or the apply is denied by policy. So `manage_private_dns = false` is the "defer to central DNS" switch: it provisions the PE only and hands DNS back to the platform team, who add the A record (pointing at the PE NIC IP) and the routing-host records in the hub zone.
 
@@ -104,6 +104,6 @@ The "Resources behind a Standard Load Balancer" category is the supported path f
 
 ## Cost model
 
-Azure Databricks bills for network egress when serverless workloads communicate with customer resources, including private-link traffic. Cross-region adds an extra premium. Plan for this in your TCO model — it is non-zero for high-throughput Delta-to-Neo4j syncs.
+Azure Databricks bills for network egress when serverless workloads communicate with customer resources, including private-link traffic. Cross-region adds an extra premium. Plan for this in your TCO model; it is non-zero for high-throughput Delta-to-Neo4j syncs.
 
 Aura VDC has its own fixed pricing model independent of network topology.

@@ -51,15 +51,15 @@ After apply:
 
 ## Notes
 
-- The `is_manual_connection = true` flag is required for cross-subscription PLS like Aura — the consumer side cannot auto-approve the connection.
-- `private_connection_resource_alias` is the canonical handle Aura publishes. Do not attempt to use an ARM resource ID for Aura's PLS — there isn't one from your side.
+- The `is_manual_connection = true` flag is required for cross-subscription PLS like Aura: the consumer side cannot auto-approve the connection.
+- `private_connection_resource_alias` is the canonical handle Aura publishes. Do not attempt to use an ARM resource ID for Aura's PLS. There isn't one from your side.
 - Public access on the Aura instance should be disabled **after** validation succeeds end-to-end, not before, to avoid locking yourself out during debugging.
 
 ## Private DNS: self-managed vs. central (hub-and-spoke)
 
 A Private Endpoint only gives you a private IP inside your subnet. The Aura hostname (`<aura-instance-id>.databases.neo4j.io`) means nothing until a **private DNS zone** answers "what IP is that hostname?" with the PE's private IP instead of Aura's public IP. This stack can own that zone for you, or step aside and let you wire it into DNS you already run. The `manage_private_dns` variable is that switch.
 
-### `manage_private_dns = true` (default — single VNet)
+### `manage_private_dns = true` (default, single VNet)
 
 Terraform creates and owns the full DNS path:
 
@@ -92,19 +92,71 @@ Larger Azure estates centralize DNS: one **hub** VNet owns the private DNS zones
 
 If this stack tried to create a `databases.neo4j.io` zone in a spoke, one of two things breaks:
 
-1. **Split-brain resolution** — two zones with the same name, and which one wins depends on which zone a given VNet happens to be linked to.
-2. **Policy denial** — many orgs enforce Azure Policy that forbids creating private DNS zones outside the hub, so `terraform apply` fails outright.
+1. **Split-brain resolution:** two zones with the same name, and which one wins depends on which zone a given VNet happens to be linked to.
+2. **Policy denial:** many orgs enforce Azure Policy that forbids creating private DNS zones outside the hub, so `terraform apply` fails outright.
 
-Setting `manage_private_dns = false` makes this stack create **only the Private Endpoint**. It skips the zone, the VNet link, the A record, *and* the PE's `private_dns_zone_group` (see `main.tf`). You then own DNS. Do this in your **hub** zone:
+Setting `manage_private_dns = false` makes this stack create **only the Private Endpoint**. It skips the zone, the VNet link, the A record, *and* the PE's `private_dns_zone_group` (see `main.tf`). You then own DNS in your **hub** zone.
 
-1. **Add the A record.** In the hub's `databases.neo4j.io` zone, create `<aura-instance-id> -> <PE private IP>`. Get the IP from this stack's output:
-   ```bash
-   terraform output private_endpoint_nic_ip
-   ```
-2. **Ensure the zone is linked to every consuming VNet.** Each spoke VNet whose workloads reach Aura must be linked to the hub zone (usually already true as a standing platform pattern). With Azure DNS Private Resolver, spokes forward to the hub resolver instead of holding per-VNet links.
-3. **Add the routing-host records too.** Aura VDC advertises Bolt *routing* addresses like `p-<dbid>-...neo4j.io` **after** the first connection. Those must resolve to the same PE private IP. Add each one to the hub zone as it appears, or use a wildcard/`p-*` record if your DNS policy allows it. Missing these is the classic `Cannot resolve address p-...neo4j.io:7687` failure.
+The steps below use the Azure CLI. Portal equivalents live under *Private DNS zones* and *DNS Private Resolver* in the portal, and the same objects map cleanly to your own Terraform or Bicep if the hub is codified. Set these shell values first, then work through the steps:
 
-Verify from any VM in a consuming VNet:
+```bash
+HUB_RG=<hub-resource-group>          # RG that owns the private DNS zones
+ZONE=databases.neo4j.io              # the zone the hub owns
+AURA_HOST=<aura-instance-id>         # e.g. abcd1234 (the label, not the FQDN)
+PE_IP=$(terraform output -raw private_endpoint_nic_ip)   # from this stack, after apply
+```
+
+**Step 1: Confirm the hub owns the `databases.neo4j.io` zone.**
+The platform team normally already runs this zone. Only create it if it does not exist, and only in the hub RG, never in a spoke:
+
+```bash
+az network private-dns zone show  --resource-group "$HUB_RG" --name "$ZONE" \
+  || az network private-dns zone create --resource-group "$HUB_RG" --name "$ZONE"
+```
+
+**Step 2: Link the zone to every consuming VNet.**
+Each spoke VNet whose workloads reach Aura must resolve against the hub zone. Add a virtual-network link per spoke with auto-registration **off**, because you are managing these records by hand:
+
+```bash
+az network private-dns link vnet create \
+  --resource-group "$HUB_RG" \
+  --zone-name "$ZONE" \
+  --name link-<spoke-name> \
+  --virtual-network <spoke-vnet-resource-id> \
+  --registration-enabled false
+```
+
+If the hub fronts DNS with **Azure DNS Private Resolver**, spokes usually do not hold per-zone links at all. They point their VNet DNS at the resolver inbound endpoint, and a forwarding ruleset sends `databases.neo4j.io` to the hub. In that model this step is already handled by the standing platform pattern, and you skip straight to the A record.
+
+**Step 3: Add the instance A record.**
+Map the Aura host label to the PE NIC private IP inside the hub zone:
+
+```bash
+az network private-dns record-set a add-record \
+  --resource-group "$HUB_RG" \
+  --zone-name "$ZONE" \
+  --record-set-name "$AURA_HOST" \
+  --ipv4-address "$PE_IP"
+```
+
+**Step 4: Add the routing-host records.**
+Aura VDC advertises Bolt *routing* addresses like `p-<dbid>-...neo4j.io` **after** the first connection, and those must resolve to the same PE private IP. Add each one to the hub zone as it appears:
+
+```bash
+az network private-dns record-set a add-record \
+  --resource-group "$HUB_RG" \
+  --zone-name "$ZONE" \
+  --record-set-name "p-<dbid>-0" \
+  --ipv4-address "$PE_IP"
+```
+
+If your DNS policy permits wildcards, a single `p-*` record set covers all of them and saves chasing hostnames one at a time. Missing these records is the classic `Cannot resolve address p-...neo4j.io:7687` failure.
+
+**Step 5: Verify from any VM in a consuming VNet.**
+Resolution must return the PE private IP, not Aura's public address:
+
 ```bash
 nslookup <aura-instance-id>.databases.neo4j.io   # must return the PE private IP
 ```
+
+If it still returns a public IP, the VNet is not linked to the hub zone (or the resolver forwarding rule is missing), so revisit step 2.

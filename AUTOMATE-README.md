@@ -18,10 +18,10 @@ then re-run).
 - **Clean or new workspace** (no prior NCC wiring): follow this document top to bottom,
   starting at *Prerequisites*.
 - **Rebuilding a half-configured workspace** (stale NCCs, an expired rule, a wrong-region
-  binding left from an earlier attempt): do the teardown in
-  [`DEPLOYMENT-STATE.md`](DEPLOYMENT-STATE.md) **first**, then return here and run the
-  orchestrator. Running the flow below against half-configured state operates on a broken
-  binding and will not converge.
+  binding left from an earlier attempt): tear down the existing wiring **first** (see
+  [Teardown](README.md#teardown)), then return here and run the orchestrator. Running the
+  flow below against half-configured state operates on a broken binding and will not
+  converge.
 
 ---
 

@@ -49,6 +49,28 @@ After apply:
    The answer must be a private IP from the PE subnet.
 3. Open a Bolt connection (`neo4j+s://<aura-instance-id>.databases.neo4j.io`) to confirm end-to-end traffic.
 
+## Definitions
+
+Terms used throughout this README:
+
+- **Private Endpoint (PE):** A network interface that Azure places inside one of your subnets. It holds a private IP and forwards traffic across Azure's backbone to Aura's Private Link Service, so Aura traffic stays off the public internet.
+- **PE NIC:** The network interface card of that Private Endpoint. It is the object that actually owns the private IP.
+- **Private IP:** The address assigned to the PE NIC from your own VNet's address range, such as `10.x.x.x`. Every reference to "the private IP" or "the PE private IP" in this README means this one address. It is what the Aura hostname must resolve to for private connectivity to work.
+- **PE subnet:** The subnet that hosts the PE NIC. Its address range determines which private IP the endpoint receives.
+- **PLS (Private Link Service):** The Aura-side endpoint your Private Endpoint connects to. Neo4j publishes it as an alias that you approve from the Aura console.
+- **Private DNS zone:** An Azure resource that answers DNS queries for a specific domain name, but only for the VNets you link to it. It overrides public DNS for that name inside your network.
+- **VNet:** An Azure Virtual Network. **Hub** and **spoke** describe a topology where one central VNet, the hub, owns shared services like DNS, and workload VNets, the spokes, connect to it over peering.
+
+### Why `databases.neo4j.io` lives in *your* private DNS zone
+
+`databases.neo4j.io` is a Neo4j-owned domain, so creating a private DNS zone with that name inside your subscription can look like you are taking over someone else's domain. You are not. A private DNS zone is a local override, not public ownership:
+
+- It applies only to the VNets you explicitly link to it. Nothing outside your network sees it.
+- It does not change global or public DNS, and it registers nothing with Neo4j or any domain registrar.
+- Its whole purpose is to intercept the Aura hostname *inside your network* and answer with the PE's private IP. The rest of the world still resolves the same hostname to Aura's public IP.
+
+This is the standard Azure Private Link pattern. To make access to a service private, you create a private DNS zone whose name matches that service's public hostname, so queries from your VNet land on your Private Endpoint instead of the public address. You use Neo4j's domain name precisely because your applications connect to Neo4j's hostname: the record has to match `databases.neo4j.io` for the interception to work. Your own domain would not help, because the Aura driver always connects to `<aura-instance-id>.databases.neo4j.io`.
+
 ## Notes
 
 - The `is_manual_connection = true` flag is required for cross-subscription PLS like Aura: the consumer side cannot auto-approve the connection.
@@ -57,7 +79,7 @@ After apply:
 
 ## Private DNS: self-managed vs. central (hub-and-spoke)
 
-A Private Endpoint only gives you a private IP inside your subnet. The Aura hostname (`<aura-instance-id>.databases.neo4j.io`) means nothing until a **private DNS zone** answers "what IP is that hostname?" with the PE's private IP instead of Aura's public IP. This stack can own that zone for you, or step aside and let you wire it into DNS you already run. The `manage_private_dns` variable is that switch.
+A Private Endpoint gives you a private IP inside your subnet, but on its own nothing connects the Aura hostname to that IP. By default `<aura-instance-id>.databases.neo4j.io` resolves to Aura's public IP. A **private DNS zone** overrides that answer inside your network so the hostname resolves to the PE's private IP instead. This stack can create and own that zone for you, or leave DNS to a system you already run. The `manage_private_dns` variable chooses between those two modes.
 
 ### `manage_private_dns = true` (default, single VNet)
 

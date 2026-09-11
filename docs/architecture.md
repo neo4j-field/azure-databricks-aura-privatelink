@@ -4,6 +4,21 @@
 
 Establish private, end-to-end Bolt+TLS connectivity between Azure Databricks Serverless compute and Neo4j Aura VDC on Azure, without any traffic leaving the Azure backbone.
 
+```
+  Databricks-managed subscription                Neo4j-managed subscription
+ ┌──────────────────────────────┐              ┌────────────────────────────┐
+ │  Serverless compute plane     │              │                            │
+ │  ┌────────────────────────┐   │              │   ┌────────────────────┐   │
+ │  │ Notebook / Job / SQL   │   │              │   │  Aura PLS           │   │
+ │  └───────────┬────────────┘   │              │   │  (terminates TLS)   │   │
+ │              │ Bolt+TLS        │              │   └─────────┬──────────┘   │
+ │  ┌───────────▼────────────┐   │              │             ▼              │
+ │  │ NCC managed DNS + PE    │───┼──────────────┼──►    Neo4j Aura VDC       │
+ │  └────────────────────────┘   │   Azure      │                            │
+ └──────────────────────────────┘   backbone    └────────────────────────────┘
+                                  (private, never traverses the public internet)
+```
+
 ## Why this architecture
 
 ### Why NCC instead of customer VNet
@@ -37,6 +52,19 @@ Azure Databricks has two network planes that often get conflated:
 
 This guide configures the **serverless compute plane** to reach Aura privately. The control plane is already private and not part of this setup.
 
+```
+  Control plane                      ┌──────────────────────┐
+  (orchestration, UI, metadata) ────►│ Databricks control    │  already private,
+                                     │ plane                 │  NOT configured here
+                                     └──────────────────────┘
+
+  Serverless compute plane           ┌──────────────────────┐        ┌───────────┐
+  (notebook / job / SQL queries) ───►│ NCC private endpoint  │───────►│ Aura PLS  │
+                                     │ configured in this    │ Azure  └───────────┘
+                                     │ guide                 │ backbone
+                                     └──────────────────────┘
+```
+
 ## DNS resolution flow
 
 When a notebook executes `socket.gethostbyname("d48d6199.databases.neo4j.io")`:
@@ -49,6 +77,26 @@ When a notebook executes `socket.gethostbyname("d48d6199.databases.neo4j.io")`:
 6. Traffic flows over the Azure backbone to Aura's PLS, which terminates TLS using its real certificate
 7. Bolt protocol proceeds normally
 
+```
+  Notebook: gethostbyname("d48d6199.databases.neo4j.io")
+       │
+       ▼
+  ┌──────────────────────────────┐
+  │ Serverless resolver           │  entry populated from the
+  │ (NCC managed DNS)             │  rule's `domain_names`
+  └───────────────┬──────────────┘
+                  │ returns the PRIVATE IP of the NCC private endpoint
+                  ▼
+  Neo4j driver ── TLS, SNI = d48d6199.databases.neo4j.io ──► private endpoint
+                                                                  │
+                                                  Azure backbone  ▼
+                                                        Aura PLS terminates TLS
+                                                        with its real certificate
+                                                                  │
+                                                                  ▼
+                                                            Bolt proceeds
+```
+
 The TLS certificate is issued for the real Aura hostname, so no certificate-trust manipulation is needed on the client side.
 
 ## DNS ownership: who answers for the Aura hostname
@@ -58,6 +106,20 @@ The DNS flow above assumes *something* maps `<aura-instance-id>.databases.neo4j.
 - **Serverless (NCC path).** DNS is not yours to manage. NCC holds a managed private-DNS layer inside the serverless compute plane, and the `domain_names` on the private endpoint rule is what populates it. There is no zone for you to create or link. See [the NCC stack](../infra/terraform/databricks-ncc/).
 
 - **Customer-managed PE path.** DNS *is* yours. A Private Endpoint only allocates a private IP on a NIC; it does not make the hostname resolve. You need an Azure **private DNS zone** for `databases.neo4j.io` holding an A record for the instance host, plus a virtual-network link so resolvers in the consuming VNet see it. Without the A record the zone is empty and the hostname silently falls back to public resolution; the connection may still work, but it is not private.
+
+```
+  Who answers for <aura-instance-id>.databases.neo4j.io ?
+
+  Serverless (NCC)          NCC managed DNS           you manage nothing;
+                            (domain_names)            no zone to create
+
+  Customer PE,              private DNS zone in       this stack creates it
+  single VNet               your resource group       (manage_private_dns = true)
+
+  Customer PE,              private DNS zone in        platform team owns it;
+  hub-and-spoke             the shared hub VNet        you add A record + link
+                                                       (manage_private_dns = false)
+```
 
 For the customer-managed path there are two topologies, and the distinction matters because it changes *who* creates the zone:
 

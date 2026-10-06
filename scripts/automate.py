@@ -264,8 +264,9 @@ def poll_rule(account_client, outputs: TerraformOutputs, timeout: int, interval:
         if state in STATE_TERMINAL_BAD:
             raise SetupError(
                 f"Rule is {state}. Recreate it with:\n"
-                "  terraform taint databricks_mws_ncc_private_endpoint_rule.aura\n"
-                "  terraform apply"
+                f"  terraform -chdir={TERRAFORM_DIR} taint "
+                "databricks_mws_ncc_private_endpoint_rule.aura\n"
+                f"  terraform -chdir={TERRAFORM_DIR} apply"
             )
 
         if state == STATE_PENDING:

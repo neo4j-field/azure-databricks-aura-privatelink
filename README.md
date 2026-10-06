@@ -4,14 +4,11 @@ Production-grade reference for establishing private, end-to-end connectivity bet
 
 This repository provides a validated step-by-step setup, along with notebooks, Terraform, and helper scripts.
 
-The Terraform under [`infra/terraform/`](infra/terraform/) is split into two sibling stacks:
+The Terraform for this setup is the **NCC stack**, [`infra/terraform/databricks-ncc/`](infra/terraform/databricks-ncc/): Databricks NCC + private endpoint rule + workspace binding.
 
-- **NCC stack**, [`infra/terraform/databricks-ncc/`](infra/terraform/databricks-ncc/): Databricks NCC + private endpoint rule + workspace binding (use this for serverless).
-- **Private Endpoint stack**, [`infra/terraform/azure-private-endpoint/`](infra/terraform/azure-private-endpoint/): Azure Private Endpoint in your own VNet + private DNS zone (use this for classic Databricks, AKS, ADF, jump VMs).
+For classic Databricks, AKS, ADF, or jump VMs, see [Private Endpoint stack setup](docs/private-endpoint-stack-setup.md).
 
-End-to-end validation for the NCC stack runs via [`notebooks/01_validate_connectivity.py`](notebooks/01_validate_connectivity.py), the deployment-agnostic check that `scripts/automate.py` runs by default. [`notebooks/03_smoke_test.py`](notebooks/03_smoke_test.py) adds a 100-row write and read-back test over the private path. See [`screenshots/`](screenshots/) for both the Private Endpoint stack walkthrough and the NCC stack setup screens.
-
-The Private Endpoint stack has been validated end-to-end from a Windows VM in East US to an Aura instance in UK South. See [`screenshots/`](screenshots/) for the captured walkthrough, including the Aura-side approval, the `Disable public traffic` lockdown, the VM's `nslookup` resolving to the PE NIC, and a working Neo4j Browser session over the private path.
+End-to-end validation runs via [`notebooks/01_validate_connectivity.py`](notebooks/01_validate_connectivity.py), the deployment-agnostic check that `scripts/automate.py` runs by default. [`notebooks/04_smoke_test.py`](notebooks/04_smoke_test.py) adds a 100-row write and read-back test over the private path. See [`screenshots/`](screenshots/) for the NCC stack setup screens.
 
 ---
 
@@ -60,45 +57,26 @@ See [docs/architecture.md](docs/architecture.md) for a detailed walkthrough incl
 
 | Item | Value |
 |------|-------|
-| Subscription role | Permission to create Private Endpoints and approve PLS connections |
+| Azure login | Signed in with `az login` as a Databricks account admin. Terraform authenticates to the Databricks account through the Azure CLI. For CI/CD, set a service principal with account admin in `terraform.tfvars` instead. |
 | Region | Region that supports Private Link for your target resources |
-
-#### Find your Azure subscription ID
-
-Step 2 asks for the Azure subscription ID where the private endpoint will be created. Look it up before you start:
-
-- **Azure portal:** Open **Subscriptions**, select your subscription, and copy the **Subscription ID** from the Overview page.
-- **Azure CLI:** Run `az account show --query id -o tsv` for the active subscription, or `az account list --query "[].{name:name, id:id}" -o table` to list all of them.
-
-For the NCC stack, the subscription that matters is the **Databricks-managed** one, not yours. You get that ID from an error message, as described in Step 2.
 
 ---
 
-## Choose your Terraform stack
+## NCC stack
 
-| Stack name | Consumer | Directory | Why |
-|---|---|---|---|
-| **NCC stack** | Azure Databricks Serverless (this repo's primary target) | [`infra/terraform/databricks-ncc/`](infra/terraform/databricks-ncc/) | Serverless compute lives in Databricks-managed subscriptions; the only supported private-network path is NCC + private endpoint rule. |
-| **Private Endpoint stack** | Classic Azure Databricks (VNet-injected), AKS, ADF self-hosted IR, jump VMs, Functions on VNet integration | [`infra/terraform/azure-private-endpoint/`](infra/terraform/azure-private-endpoint/) | Private Endpoint into Aura's PLS in your own VNet, plus a `databases.neo4j.io` private DNS zone linked to that VNet. |
+Serverless compute lives in Databricks-managed subscriptions, so the only supported private-network path is an NCC plus a private endpoint rule. Databricks creates and manages the private endpoint and its DNS.
 
-In the **NCC stack**, Databricks creates and manages the private endpoint and its DNS. In the **Private Endpoint stack**, you create the endpoint in your own VNet, so you also own DNS. These two names are used throughout this repo.
-
-The two stacks are independent. You can run only the NCC stack, only the Private Endpoint stack, or both side-by-side if different teams in the same subscription consume Aura over both surfaces.
-
-### Decide who owns DNS (Private Endpoint stack only)
-
-On the Private Endpoint stack, decide **who owns DNS for `databases.neo4j.io`** before you apply. The NCC stack has no such choice; NCC owns DNS entirely, so this applies only to the Private Endpoint stack:
-
-- **Self-managed (single VNet):** the default (`manage_private_dns = true`). The stack creates the `databases.neo4j.io` private DNS zone, links it to your VNet, and writes the Aura A record. Nothing else to wire.
-- **Central / hub-and-spoke:** set `manage_private_dns = false` when your organization manages private DNS centrally: a hub VNet holds the zones (often behind Azure DNS Private Resolver) and spokes consume them over peering and zone links. The stack then provisions the Private Endpoint only; you add the A record plus the `p-*` routing-host records in your hub zone.
-
-See the [private-DNS section of the azure-private-endpoint README](infra/terraform/azure-private-endpoint/README.md#private-dns-self-managed-vs-central-hub-and-spoke) for the exact steps and [docs/architecture.md](docs/architecture.md#dns-ownership-who-answers-for-the-aura-hostname) for the rationale.
-
-Once you have picked a stack, see [Setup: automated or manual](#setup-automated-or-manual) to choose how to run it.
+Once you are ready to start, see [Setup: automated or manual](#setup-automated-or-manual) to choose how to run it.
 
 ## Setup: automated or manual
 
-Two Aura-console actions have no API and stay manual either way: adding the Databricks-managed subscription to Aura's allow-list (Step 2) and approving the private endpoint (Step 7). Everything else can be scripted.
+The Aura console has no API, so its steps stay manual either way:
+
+- **Before you start:** Provision Aura and enable Private Link to get the PLS alias and hostname (Steps 1 and 2).
+- **During setup:** Two actions pause the flow. You add the Databricks-managed subscription to Aura's allow-list (Step 6) and approve the private endpoint (Step 7).
+- **After validation:** Disabling public access (Step 9) is also manual.
+
+Everything else on the Databricks side can be scripted.
 
 **Automated (recommended for the NCC stack demo).** `scripts/automate.py` drives the Databricks side end to end: it runs Terraform, polls the endpoint rule to ESTABLISHED, restarts warehouses, loads the `neo4j` secret scope, and runs the validation notebook. It is re-entrant and pauses only for the two Aura actions above.
 
@@ -106,11 +84,103 @@ Two Aura-console actions have no API and stay manual either way: adding the Data
 uv run scripts/automate.py run --account-profile <name>
 ```
 
-See [AUTOMATE-README.md](AUTOMATE-README.md) for the full flow. To remove the Databricks side afterward, see [Teardown](#teardown).
+See [docs/automate-tf-ncc-setup.md](docs/automate-tf-ncc-setup.md) for the full flow. To remove the Databricks side afterward, see [Teardown](#teardown).
 
-**Manual / step-by-step.** Follow Steps 1-9 below. Use this to understand each step, or when you are on the Private Endpoint stack (`azure-private-endpoint/`), which the orchestrator does not cover.
+**Manual / step-by-step.** Follow Steps 0-9 below. Use this to understand each step.
+
+For a CLI-first version of the Databricks steps, see [docs/manual-ncc-setup.md](docs/manual-ncc-setup.md). It documents what the Terraform stack does, plus steps the README does not cover:
+
+- Creating the NCC and attaching it to the workspace with the Databricks CLI or REST, instead of the console (Steps 4 and 5).
+- Creating the private endpoint rule with the CLI, including several hostnames in `domain_names`.
+- Checking the rule status until it reads `ESTABLISHED`.
+- Adding a `p-*.neo4j.io` routing hostname to an existing rule, without Terraform.
+- Deleting and recreating an expired or failed rule.
 
 ## Setup Steps (Validated)
+
+### Step 0: Sign in and collect your values
+
+This step gathers the values that later steps reuse.
+
+| Value | What it is | Where to find it |
+|-------|------------|------------------|
+| `TENANT_ID` | Entra ID tenant that owns the subscription your workspace is deployed in | Azure portal, Microsoft Entra ID, Overview. Or run `az account show --query tenantId -o tsv`. |
+| `SUB_ID` | Azure subscription that holds the workspace | Azure portal, Subscriptions |
+| `WORKSPACE_PROFILE` | Databricks CLI profile name for the workspace | `~/.databrickscfg`, or run `databricks auth profiles` |
+| `WORKSPACE_URL` | Host URL of the workspace | Azure portal, the workspace Overview page |
+| `WORKSPACE_NAME` | Display name of the workspace in the account | Account Console, Workspaces |
+| `ACCOUNT_PROFILE` | Databricks CLI profile name for the account console | A new name, or an existing account-level profile |
+| `DATABRICKS_ACCOUNT_ID` | ID of your Databricks account | Account Console, user menu in the top right corner |
+| `NCC_ID` | ID of the NCC attached to the workspace | Looked up by the command at the end of this step |
+
+**Tools.** `az` and the `databricks` CLI must be on PATH. The automated path also needs `uv` and `terraform`.
+
+**Azure login.** Sign in as a Databricks account admin against the correct tenant and subscription:
+
+```bash
+az login --tenant <TENANT_ID>
+az account set --subscription <SUB_ID>
+```
+
+- **Tenant ID:** In the Azure portal, open Microsoft Entra ID and read Tenant ID under Basic information on the Overview page. From the CLI, run `az account show --query tenantId -o tsv`. Use the tenant that owns the subscription your Databricks workspace is deployed in.
+- **Subscription ID:** This is a separate value, listed under Subscriptions in the portal.
+
+**Workspace CLI profile.** The profile must exist and authenticate. Set its name once, along with the workspace URL:
+
+```bash
+export WORKSPACE_PROFILE="<workspace-profile>"
+export WORKSPACE_URL="<workspace-url>"
+```
+
+Then check that it authenticates:
+
+```bash
+databricks --profile "$WORKSPACE_PROFILE" current-user me
+```
+
+If it reports stored credentials from an older CLI version, sign in again:
+
+```bash
+databricks auth login --host "$WORKSPACE_URL" --profile "$WORKSPACE_PROFILE"
+```
+
+**Account-console CLI profile.** NCC calls target `accounts.azuredatabricks.net`, which is a different auth context from the workspace. Find `DATABRICKS_ACCOUNT_ID` in the Account Console by opening the user menu in the top right corner. Set both values once. Every later command in this README reuses them:
+
+```bash
+export ACCOUNT_PROFILE="<account-profile>"
+export DATABRICKS_ACCOUNT_ID="<databricks-account-id>"
+```
+
+`ACCOUNT_PROFILE` must be a new profile name or an existing account-level profile, never a workspace profile, or the login fails with a host conflict.
+
+Sign in once to create the profile:
+
+```bash
+databricks auth login --host https://accounts.azuredatabricks.net \
+  --account-id "$DATABRICKS_ACCOUNT_ID" --profile "$ACCOUNT_PROFILE"
+```
+
+Then verify the profile can list NCCs:
+
+```bash
+databricks --profile "$ACCOUNT_PROFILE" account network-connectivity list-network-connectivity-configurations
+```
+
+Any JSON list counts as a pass. Check that each entry shows the `account_id` from the login command above. An auth or permission error means the profile cannot reach the account console. The NCCs listed are existing ones in the account, including expired rules and rules that belong to other people. Leave them alone, because the NCC stack creates its own NCC.
+
+**Collect the values.** Step 6 reads `NCC_ID`. The workspace record holds the ID of the NCC attached to it. Set your workspace name, then run the lookup:
+
+```bash
+export WORKSPACE_NAME="<workspace-name>"
+```
+
+```bash
+export NCC_ID="$(databricks --profile "$ACCOUNT_PROFILE" account workspaces list -o json \
+  | jq -r --arg ws "$WORKSPACE_NAME" '.[] | select(.workspace_name==$ws) | .network_connectivity_config_id')"
+echo "$NCC_ID"
+```
+
+`NCC_ID` is empty until an NCC is attached to the workspace in [Step 5](#step-5-attach-the-ncc-to-your-workspace). The bearer token for Step 6 comes from the same `az login`.
 
 ### Step 1: Provision Neo4j Aura VDC on Azure
 
@@ -127,11 +197,8 @@ In the Aura console:
 3. Configure:
    - **Product**: AuraDB VDC (matches your tier)
    - **Region**: same Azure region as your Aura instance
-   - **Target Azure Subscription IDs**: This field is mandatory. Without the right subscription, Aura will not see incoming private endpoint requests.
-     - **Private Endpoint stack:** Paste the subscription ID(s) where the private endpoint will be created. See [Find your Azure subscription ID](#find-your-azure-subscription-id).
-     - **NCC stack:** The request comes from a **Databricks-managed Azure subscription**, not necessarily your workspace subscription.
-     - **NCC stack, first apply fails:** If the error is `ThirdPartyPrivateLinkService...DoesNotExistOrIsNotVisible`, copy the subscription ID from that error into the Aura allow-list and retry.
-   - Toggle **Enable Private Link**
+   - **Target Azure Subscription IDs**: This field is mandatory. Enter your own Azure subscription ID for now. The private endpoint request comes from a **Databricks-managed Azure subscription**, which you only learn after the first apply fails. You add it in [Step 6](#step-6-add-a-private-endpoint-rule-for-neo4j-aura-pls).
+   - In **Edit network access configuration**, toggle **Enable Private Link**
 4. Click **Save**
 5. Copy the **Private Link service name** (also called the PLS alias). It looks like `pls-<id>.<guid>.<region>.azure.privatelinkservice`.
 6. Open your Aura instance details. You will now see a **Private URI** in addition to the Connection URI. The Private URI is what your applications will use.
@@ -146,6 +213,8 @@ If you don't already have one:
 2. Confirm **Serverless compute** is enabled (`Settings → Compute → Serverless`).
 
 ### Step 4: Create a Network Connectivity Configuration (NCC)
+
+> **Using Terraform for Step 6? Skip Steps 4 and 5.** The NCC stack creates the NCC and binds it to the workspace itself. Creating one in the console as well leaves you with two NCCs, and the Terraform binding replaces yours. Do Steps 4 and 5 by hand only when you create the rule with the REST API.
 
 In the **Account Console** (`https://accounts.azuredatabricks.net/`), as **account admin**:
 
@@ -179,11 +248,21 @@ In the **Account Console** (`https://accounts.azuredatabricks.net/`), as **accou
 
 See [scripts/create-private-endpoint-rule.sh](scripts/create-private-endpoint-rule.sh) for a ready-to-run script.
 
-Minimal example:
+Minimal example. `DATABRICKS_ACCOUNT_ID` and `NCC_ID` are already set from [Step 0](#step-0-sign-in-and-collect-your-values). Export the remaining variables the request needs:
+
+```bash
+export AURA_PLS_ALIAS="pls-<id>.<guid>.<region>.azure.privatelinkservice"
+export AURA_PRIVATE_HOSTNAME="<aura-id>.databases.neo4j.io"
+export DATABRICKS_TOKEN="$(az account get-access-token \
+  --resource 2ff814a6-3304-4ab8-85cb-cd0e6f879c1d \
+  --query accessToken -o tsv)"
+```
+
+Then send the request:
 
 ```bash
 curl --location --request POST \
-  "https://accounts.azuredatabricks.net/api/2.0/accounts/${ACCOUNT_ID}/network-connectivity-configs/${NCC_ID}/private-endpoint-rules" \
+  "https://accounts.azuredatabricks.net/api/2.0/accounts/${DATABRICKS_ACCOUNT_ID}/network-connectivity-configs/${NCC_ID}/private-endpoint-rules" \
   --header "Authorization: Bearer ${DATABRICKS_TOKEN}" \
   --header "Content-Type: application/json" \
   --data @- <<EOF
@@ -201,39 +280,67 @@ Where:
 
 For Aura VDC routing, the Neo4j driver can also receive `p-*.neo4j.io` Bolt addresses from the routing table. If a validation notebook fails with `Cannot resolve address p-...neo4j.io:7687`, add that hostname to the same private endpoint rule `domain_names` list. The Terraform stack exposes this as `aura_extra_domain_names`.
 
+**If the first apply fails** with `ThirdPartyPrivateLinkService...DoesNotExistOrIsNotVisible`, the request came from a Databricks-managed subscription that Aura does not yet trust. Copy the subscription ID from that error into the Aura allow-list, then retry:
+
+1. In the Aura console, open **Project settings → Security & Networking → Private endpoints** and edit the network access configuration from [Step 2](#step-2-enable-private-link-in-aura-network-access-configuration).
+2. Add the subscription ID from the error to **Target Azure Subscription IDs**.
+3. Save, then re-run the apply.
+
 After submission the rule will appear in the NCC with status `PENDING`.
 
 ### Step 7: Approve the Private Endpoint in the Aura Console
 
 1. Return to Aura → **Project settings → Security & Networking → Private endpoints**
-2. Locate the incoming endpoint request from the Databricks-managed Azure subscription
-3. Click **Accept**
-4. Wait until status reads **Approved**
-5. In Databricks, refresh the NCC view. The rule status should transition to `ESTABLISHED`
+2. Open **Edit network access configuration** and go to **Step 3 of 4: Endpoint Connection Requests**
+3. Locate the incoming endpoint request from the Databricks-managed Azure subscription
+4. Click **Accept**
+5. Wait until status reads **Approved**
+6. In the [Account Console](https://accounts.azuredatabricks.net/), go to **Security → Network connectivity configurations**, open your NCC, and select the **Private endpoint rules** tab. Refresh the page. The **Connection status** column for your rule should transition from `PENDING` to `ESTABLISHED`
 
 > A rule that stays in `PENDING`, `REJECTED`, or `DISCONNECTED` for **14 days will expire** and must be recreated. Don't leave half-finished setups.
 
 ### Step 8: Verify DNS and Connectivity
 
-DNS resolution for the Aura Private URI is handled by Databricks NCC because you supplied `domain_names` in Step 6. From a serverless notebook:
+**Create the secret scope.** The notebooks read Neo4j credentials from a secret scope named `neo4j` in the workspace. Copy the sample file and fill it in. The URI host must match the Private URI host you gave the rule in Step 6:
+
+```bash
+cp env.sample .env
+```
+
+`.env` is gitignored. It holds `WORKSPACE_PROFILE` and the `NEO4J_*` values. Then run the script from the repository root. It creates the scope and stores the `uri`, `username`, `password`, and `database` keys:
+
+```bash
+./scripts/create-secret-scope.sh
+```
+
+**Upload the notebooks.** Run this from the repository root. It copies the notebooks into a `neo4j-privatelink` folder in your user area of the workspace:
+
+```bash
+: "${WORKSPACE_PROFILE:?WORKSPACE_PROFILE is not set}"
+export NOTEBOOK_DIR="/Users/$(databricks --profile "$WORKSPACE_PROFILE" current-user me -o json | jq -r .userName)/neo4j-privatelink"
+databricks --profile "$WORKSPACE_PROFILE" workspace mkdirs "$NOTEBOOK_DIR"
+for f in notebooks/0*.py; do
+  databricks --profile "$WORKSPACE_PROFILE" workspace import "$NOTEBOOK_DIR/$(basename "$f" .py)" \
+    --file "$f" --format SOURCE --language PYTHON --overwrite
+done
+```
+
+Open the `neo4j-privatelink` folder in the workspace and attach each notebook to serverless compute before you run it.
+
+**Run the validation notebook.** Run [notebooks/01_validate_connectivity.py](notebooks/01_validate_connectivity.py) from the uploaded folder. DNS resolution for the Aura Private URI is handled by Databricks NCC because you supplied `domain_names` in Step 6, and the notebook checks it for you. It resolves the Aura host, asserts the address is private, and then runs the Bolt connectivity check. No separate DNS check is needed. For a fuller test that writes and reads back sample data, use [notebooks/04_smoke_test.py](notebooks/04_smoke_test.py), which repeats the same DNS assertion.
+
+**Debugging DNS (optional).** Only if a notebook fails and you need to see which hostname is not resolving privately, run this from a serverless notebook:
 
 ```python
 import socket
-host = "<aura-id>.databases.neo4j.io"   # replace <aura-id> with your Aura instance id
-print(socket.gethostbyname(host))      # should return a 10.x or similar private IP
-```
-
-If the Bolt validation reveals additional routing hostnames, verify them too:
-
-```python
 for host in [
-    "<aura-id>.databases.neo4j.io",
-    "p-<aura-id>-<suffix>.<orch>.neo4j.io",
+    "<aura-id>.databases.neo4j.io",                # replace <aura-id> with your Aura instance id
+    "p-<aura-id>-<suffix>.<orch>.neo4j.io",        # routing hostname, if the Bolt check reports one
 ]:
-    print(host, socket.gethostbyname(host))
+    print(host, socket.gethostbyname(host))        # should return a 10.x or similar private IP
 ```
 
-Then run the end-to-end validation notebook [notebooks/01_validate_connectivity.py](notebooks/01_validate_connectivity.py). For a fuller test that writes and reads back sample data, use [notebooks/03_smoke_test.py](notebooks/03_smoke_test.py).
+Notebook 01 maps `p-*.neo4j.io` routing hostnames to the private Aura host, so it does not report an unresolved one as a DNS failure. Use this snippet to check them directly.
 
 ### Step 9: Disable Public Access on Aura (Recommended)
 
@@ -269,20 +376,25 @@ To remove the Databricks side, follow [docs/teardown.md](docs/teardown.md). It c
 ```
 .
 ├── README.md                                       # This file
+├── security-review.md                              # Security review findings
 ├── LICENSE                                         # Apache 2.0
 ├── docs/
 │   ├── architecture.md                             # Detailed architecture and rationale
 │   ├── validation-report.md                        # Setup steps checked against official docs
 │   ├── troubleshooting.md                          # Common issues and fixes
+│   ├── automate-tf-ncc-setup.md                    # Operator steps for scripts/automate.py
+│   ├── manual-ncc-setup.md                         # NCC setup by hand with the Databricks CLI or REST
 │   ├── teardown.md                                 # Remove the Databricks side and Aura cleanup
 │   ├── developer-desktop-access.md                 # Neo4j Desktop / browser access after public traffic disabled
 │   ├── batch-jobs-other-vnets.md                   # Private Link connectivity for workloads in other VNets
+│   ├── private-endpoint-stack-setup.md             # Private Endpoint stack setup (classic Databricks, AKS, ADF, jump VMs)
+│   ├── suggest-improvements.md                     # Suggested improvements
 │   └── images/                                     # SVG diagrams used in the docs
 ├── notebooks/
 │   ├── 01_validate_connectivity.py                 # Generic DNS + Bolt sanity check
 │   ├── 02_delta_to_neo4j.py                        # Round-trip: Delta -> Neo4j -> Delta
-│   ├── 03_smoke_test.py                            # End-to-end PrivateLink smoke test with write and read-back
-│   └── 04_serverless_push_pull_demo.py             # Small push/pull demo over PrivateLink (synthetic customers)
+│   ├── 03_serverless_push_pull_demo.py             # Small push/pull demo over PrivateLink (synthetic customers)
+│   └── 04_smoke_test.py                            # End-to-end PrivateLink smoke test with write and read-back
 ├── infra/
 │   └── terraform/
 │       ├── README.md                               # Index: which stack to pick
@@ -290,6 +402,7 @@ To remove the Databricks side, follow [docs/teardown.md](docs/teardown.md). It c
 │       ├── azure-private-endpoint/                 # Private Endpoint stack: PE in your VNet + private DNS
 │       └── jumpbox/                                # Azure Bastion + jump box VM for developer desktop access
 ├── scripts/
+│   ├── automate.py                                 # Orchestrator for the NCC stack setup (see docs/automate-tf-ncc-setup.md)
 │   ├── create-secret-scope.sh                      # Databricks secret scope setup
 │   ├── create-private-endpoint-rule.sh             # REST API fallback for the NCC PE rule
 │   └── validate-dns.py                             # Standalone DNS check
@@ -320,7 +433,6 @@ To remove the Databricks side, follow [docs/teardown.md](docs/teardown.md). It c
 | 14-day expiry on unapproved rules | Approve promptly in Aura console |
 | 10-minute NCC propagation after attach | Wait, then restart serverless services |
 | Aura Private Link is region-scoped, not instance-scoped | Plan multi-region setups accordingly |
-| Private Endpoint stack in a central-DNS (hub-and-spoke) org: a self-created zone collides with the hub or is blocked by Azure Policy | Set `manage_private_dns = false`; add the A record + routing-host records in the hub zone |
 
 ---
 

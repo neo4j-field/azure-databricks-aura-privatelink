@@ -63,7 +63,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ### H1. Aura public access stays on and nothing checks that it is off
 
-- **Where:** The setup guidance sits in `infra/terraform/azure-private-endpoint/README.md` line 78 and `docs/architecture.md` line 165.
+- **Where:** The setup guidance sits in `docs/private-endpoint-stack-setup.md` line 89 and README Step 9.
 - **Risk:** Private Link protects traffic only when the public endpoint is off. The docs say to turn public access off after validation. No script, test, or checklist item confirms it. Until then, the admin account is reachable from the internet with only a password.
 - **Impact:** The private path adds no protection while the public path stays open.
 - **Fix:** Add a final "definition of done" step to `scripts/automate.py` that prints a required manual action to disable public traffic in the Aura console.
@@ -106,7 +106,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ### M2. The public repo carries real identifiers and has no secret scanning
 
-- **Where:** The GitHub repo `neo4j-field/azure-databricks-aura-privatelink` is public. `README.md` and `AUTOMATE-README.md` line 49 hold the Databricks account ID and workspace host. `notebooks/03_smoke_test.py` hardcodes an Aura hostname and a workspace name.
+- **Where:** The GitHub repo `neo4j-field/azure-databricks-aura-privatelink` is public. `README.md` and `docs/automate-tf-ncc-setup.md` line 49 hold the Databricks account ID and workspace host. `notebooks/04_smoke_test.py` hardcodes an Aura hostname and a workspace name.
 - **Risk:** These values are identifiers, not credentials. They still map your environment for phishing and targeted attacks.
 - **Risk:** The repo has no CI, no secret scanning, and no pre-commit checks. A future mistake would ship a real secret to a public repo.
 - **Fix:** Replace real values in tracked files with placeholders. Read them from environment variables or tfvars.
@@ -153,16 +153,16 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ### M7. Private DNS covers one hostname and the wildcard advice is wrong
 
-- **Where:** `infra/terraform/azure-private-endpoint/main.tf` lines 102 to 107 create one A record. `infra/terraform/azure-private-endpoint/README.md` step 4 and `docs/architecture.md` line 133 suggest a `p-*` wildcard record.
+- **Where:** `infra/terraform/azure-private-endpoint/main.tf` lines 102 to 107 create one A record. `docs/private-endpoint-stack-setup.md` step 4 and `docs/architecture.md` line 133 suggest a `p-*` wildcard record.
 - **Risk:** Aura routing hosts such as `p-...` need their own records. A missing record breaks the connection, and operators then loosen settings to make it work.
 - **Risk:** A DNS wildcard must be the whole label `*`. A record named `p-*` matches nothing. A real `*` record would point every Aura hostname at your endpoint.
-- **Fix:** Add a variable such as `aura_extra_hostnames` and create one A record for each name.
+- **Fix:** Add a routing-hostname list variable. Create a private DNS zone and VNet link for each distinct `<orch>.neo4j.io` domain, then one A record per routing host. See T6.
 - **Fix:** Correct the README. Tell operators to add explicit records.
 - **Fix:** Do not enable the NxDomainRedirect fallback on the zone link. It sends unresolved names to public DNS.
 
 ### M8. The Aura subscription allow-list and approval step need tighter control
 
-- **Where:** `AUTOMATE-README.md` step 2 tells the operator to add a Databricks-managed subscription ID to the Aura allow-list. The text says this "can iterate".
+- **Where:** `docs/automate-tf-ncc-setup.md` step 2 tells the operator to add a Databricks-managed subscription ID to the Aura allow-list. The text says this "can iterate".
 - **Risk:** The allow-list lets that subscription request connections to your PLS. A Databricks-managed subscription is not yours, and it can host endpoints for other customers. Confirm this with Databricks.
 - **Risk:** Manual approval is then the only control. A pending request can sit for 14 days.
 - **Fix:** Before approving, match the pending request to the endpoint named in the NCC rule output. Reject any request that does not match.
@@ -209,7 +209,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ### L3. Notebooks live in `/Shared` and the delete demos have no guard
 
-- **Where:** `scripts/automate.py` line 72 sets the import folder to `/Shared/aura-privatelink`. `notebooks/03_smoke_test.py` line 240 and `notebooks/04_serverless_push_pull_demo.py` line 109 build `DETACH DELETE` queries from f-string labels.
+- **Where:** `scripts/automate.py` line 72 sets the import folder to `/Shared/aura-privatelink`. `notebooks/04_smoke_test.py` line 240 and `notebooks/03_serverless_push_pull_demo.py` line 109 build `DETACH DELETE` queries from f-string labels.
 - **Risk:** `/Shared` is usually open to all workspace users. Confirm this in your workspace. Another user could edit a notebook that then runs with the operator's secret access.
 - **Risk:** The label constants are safe today. With the admin account, a wrong label deletes real data.
 - **Fix:** Import notebooks to `/Workspace/Users/<operator>/aura-privatelink` and set folder permissions. Alternatively, run from a Git folder pinned to a commit.
@@ -257,7 +257,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 - **Secret variables:** Secret inputs are marked `sensitive` and default to null.
 - **Git hygiene:** `.gitignore` covers `.env*`, `*.tfvars`, `*.tfstate*`, and key files. The full history holds none of them.
 - **Secret handling in code:** Notebooks read credentials from `dbutils.secrets`. `scripts/automate.py` writes secrets through the SDK, not a shell command.
-- **Guard rails:** `notebooks/03_smoke_test.py` asserts the host before it runs, and the shell scripts use `set -euo pipefail`.
+- **Guard rails:** `notebooks/04_smoke_test.py` asserts the host before it runs, and the shell scripts use `set -euo pipefail`.
 
 ## Recommended order of work
 
@@ -269,6 +269,201 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 6. **Add a review gate:** Show the plan before apply and remove the default profile, as in M3.
 7. **Harden the relay and subnet:** Add `bind=127.0.0.1` to socat and enable network policies on the PE subnet, as in M5 and M6.
 8. **Pin dependencies:** Commit the lock files and pin packages, as in M9.
+
+## Terraform changes needed
+
+Ten findings need Terraform changes. The rest are script, notebook, docs, or process fixes. Each row names the stack, the change, and the finding it closes.
+
+| # | Stack | Change | Finding |
+|---|---|---|---|
+| T1 | All three | Pin each provider with a pessimistic constraint and an upper bound. Use `~> 1.121` for Databricks. Pick the azurerm major version from a fresh lock file. Commit each `.terraform.lock.hcl`. | M9 |
+| T2 | All three | Add an `azurerm` backend with Entra ID auth, so state lives in Azure Storage with versioning, soft delete, and locking. Use partial backend configuration so no storage names are committed. | M1 |
+| T3 | NCC | Add `validation` blocks for the account ID, workspace ID, PLS alias, instance hostname, and extra hostnames. Remove the unused `databricks_workspace_url` variable. | L5 |
+| T4 | NCC | Remove the `azure_client_secret` variable and its tfvars placeholder. A service principal secret then comes only from the environment. Prefer Azure CLI sign-in or workload identity federation. | M10 |
+| T5 | NCC | Add `databricks_account_network_policy` in restricted access mode. Bind it to the workspace with `databricks_workspace_network_option`. Allow the Aura instance hostname, each routing hostname, and the package index hosts the notebooks need. | H2 |
+| T6 | PE | Add a routing-hostname list variable. For each distinct `<orch>.neo4j.io` domain, create a private DNS zone and a VNet link. Create one A record per routing host that points at the PE NIC IP. Leave NxDomainRedirect off. | M7 |
+| T7 | PE | Add an opt-in NSG that allows only the client CIDRs to the Neo4j ports and denies the rest, plus its subnet association. Add a precondition that fails the plan when NSG network policies are off on the PE subnet. Fix the subnet variable description. | M6 |
+| T8 | Jump box | Add `bind=127.0.0.1` to each socat listener. Add `DynamicUser=yes`, `NoNewPrivileges=yes`, and `ProtectSystem=strict` to each relay unit. | M5 |
+| T9 | Jump box | Pin the VM image version through a variable. Install and enable `unattended-upgrades` in the startup script. | M9 |
+| T10 | Jump box | Set `encryption_at_host_enabled = true`. Add the `AADSSHLoginForLinux` extension and a system-assigned identity. Fix the stale "gcloud ssh" text in the `ssh_public_key` description. | L2 |
+| T11 | PE, jump box | Add `CanNotDelete` locks on the PE, the DNS zones, and the jump box. Send Bastion audit logs and the Activity Log to Log Analytics. Alert on PE and NSG changes. Add a jump box auto-shutdown schedule. | L1 |
+
+Three findings need a correction before their Terraform change lands:
+
+- **M7 correction:** Routing hosts sit under `<orch>.neo4j.io`, not under `databases.neo4j.io`. An A record per name in the existing zone would never match them. T6 creates a zone per routing domain instead. `docs/private-endpoint-stack-setup.md` now describes this, so the README fix in M7 is done.
+- **L5 correction:** Routing hostnames in `aura_extra_domain_names` end in `<orch>.neo4j.io`. A `.databases.neo4j.io` check on that list would reject valid input. T3 checks the instance hostname for `.databases.neo4j.io` and the extra list for `.neo4j.io`.
+- **H2 dependency:** The notebooks run `%pip install` on serverless. A restricted policy blocks PyPI unless its hosts are on the allow list. T5 must list them, or the validation notebook fails before it reaches Aura.
+
+## Order of Terraform changes
+
+1. **T1, pin providers.** Every later diff then comes from our change, not a provider upgrade. The network policy resources in T5 also need a floor above today's `>= 1.55.0`. Databricks added them in provider v1.104.0.
+2. **T2, remote state.** Migrating state before more resources land in it keeps the move small.
+3. **T3 and T4, validation and credential cleanup.** Neither changes infrastructure. Both catch bad input before the high-risk change in step 4.
+4. **T5, serverless egress policy.** This closes the only High finding that Terraform can fix. It comes after steps 1 to 3 so a typo or a provider surprise cannot widen the damage.
+5. **T6, then T7, PE stack DNS and NSG.** DNS goes first. The NSG test needs working name resolution to tell a blocked connection from a DNS failure.
+6. **T8, T9, and T10, jump box.** T8 goes first because it closes a Medium finding with a small change.
+7. **T11, locks, diagnostics, and alerts.** Locks go last. They block the destroy-and-recreate cycles that earlier steps may need.
+
+## Phased implementation and testing plan
+
+### Goal
+
+Apply T1 to T11 one phase at a time. After each phase, prove that the private path still works and that the fix does what it claims.
+
+### Assumptions
+
+- The current setup passes one clean run first. Phase 0 records that baseline.
+- The demo workspace and Aura instance can break for a short time. If not, run Phase 3 in a separate workspace first.
+- The operator is a Databricks account admin. Creating Azure locks also needs Owner or User Access Administrator on the resource groups.
+- The workspace tier supports serverless egress control. Phase 3 confirms this before any change.
+- Phases 4 to 6 apply only where the PE stack and jump box are deployed. Mark them skipped otherwise.
+
+### Risks
+
+- **Egress lockout:** A restricted policy that misses a host breaks every serverless workload in the workspace, not only this repo's notebooks. Start in dry-run mode if available, and keep a one-step rollback to the default policy.
+- **State migration:** A failed backend migration can split state. Back up local state first, and confirm a clean plan after the move.
+- **Shared subnet NSG:** An NSG on a subnet the stack does not own can cut off other workloads in that subnet. T7 is opt-in for this reason. Confirm the subnet holds only the PE before you enable it.
+- **Jump box replacement:** Changing the startup script replaces the VM. Encryption at host also needs the `EncryptionAtHost` feature registered on the subscription.
+- **Locks block teardown:** `CanNotDelete` locks make `terraform destroy` and `docs/teardown.md` fail until you remove them.
+- **Validation too strict:** A tight pattern can reject a valid alias or hostname. Test each rule against the working tfvars before you merge it.
+
+### Deliberately not doing
+
+- **Non-Terraform findings:** H1, H3, M2, M3, M4, M8, L3, L4, L6, and L7 get their own pass. H1 needs no Terraform, so check it during Phase 0.
+- **Secrets in Terraform:** Managing secret scopes or secret values in Terraform would put the Aura password in state. The script keeps that job.
+- **Wildcard DNS records:** M7 explains why a `p-*` record matches nothing and a `*` record captures too much.
+- **Git history rewrite:** M2 rates it optional, because the exposed values are identifiers.
+- **CI scanners:** Wiring `trivy` and `checkov` into CI is M2 work. This plan runs them locally as a check.
+
+### Decisions
+
+- **Pin first.** A locked provider keeps each phase's diff limited to our change. Pinning at the end is dropped.
+- **Zone per routing domain.** Routing hosts live under `<orch>.neo4j.io`, so they need their own zone. Wildcards and extra records in the instance zone are dropped.
+- **Precondition, not subnet edits.** The PE stack reads the subnet and does not own it. A precondition fails the plan when network policies are off. Having the stack change the subnet is dropped.
+- **Secret from the environment only.** A tfvars file holds a `sensitive` variable in plaintext on disk. Keeping the variable is dropped.
+- **Reuse the Aura hostnames for the allow list.** The NCC stack already holds them, so T5 feeds the policy from the same variables. Package hosts get their own variable with a PyPI default. Hardcoded hosts are dropped.
+- **Locks last.** Adding locks with each resource would block the recreate cycles earlier phases need. That option is dropped.
+
+### Checks for every phase
+
+- `terraform fmt -check` and `terraform validate` pass in each changed stack.
+- `terraform plan -out` shows only the changes the phase intends. Apply that saved plan.
+- `trivy config` and `checkov` on the changed stack show no new findings.
+- After any NCC stack apply, `automate.py run --no-apply --skip-warehouse-restart` prints `SUCCESS`.
+- The phase status below records the result.
+
+### Phase 0: Baseline run
+
+- **Status:** Pending
+- **Outcome:** The current setup passes end to end, and its outputs are on record.
+- **Checklist:**
+  - [ ] Run `automate.py run` from a clean state, following `docs/automate-tf-ncc-setup.md`.
+  - [ ] Record the NCC ID, the rule ID, any routing hostnames, and the validation output.
+  - [ ] Check the live Aura public access setting, as in H1, and record it.
+  - [ ] Back up local state and tfvars outside the repo. Run `chmod 600` on them, as in M1.
+- **Validation:** The run exits `0` and prints `SUCCESS`.
+
+### Phase 1: Pin providers and move state (T1, T2)
+
+- **Status:** Pending
+- **Outcome:** Each stack uses locked provider versions and remote state. No infrastructure changes.
+- **Checklist:**
+  - [ ] Set pessimistic constraints with upper bounds in all three stacks.
+  - [ ] Remove `.terraform.lock.hcl` from `.gitignore` and commit each lock file.
+  - [ ] Create the state storage account with versioning, soft delete, and Entra ID auth.
+  - [ ] Add the backend block and migrate state in each deployed stack.
+  - [ ] Delete local state backups once remote state checks out.
+- **Validation:**
+  - `terraform plan` reports no changes in each stack after the migration.
+  - `terraform init` on a fresh clone installs the locked provider versions.
+  - A second `terraform plan` started during the first one waits on the state lock.
+
+### Phase 2: NCC input validation and credential cleanup (T3, T4)
+
+- **Status:** Pending
+- **Outcome:** Bad input fails at plan time. No variable can hold the service principal secret.
+- **Checklist:**
+  - [ ] Add validation for the account ID, workspace ID, PLS alias, instance hostname, and extra hostnames.
+  - [ ] Remove `databricks_workspace_url` and `azure_client_secret`. Remove both from `terraform.tfvars.example` and from your local tfvars.
+  - [ ] Document the environment variable path for service principal auth in the tfvars example and `docs/automate-tf-ncc-setup.md`.
+- **Validation:**
+  - The working tfvars passes `terraform plan` with no changes.
+  - A bad alias, a non-numeric workspace ID, and a misspelled instance hostname each fail the plan with a clear message.
+  - A routing hostname under `<orch>.neo4j.io` in the extra list passes.
+  - `automate.py run --no-apply` still prints `SUCCESS`.
+
+### Phase 3: Serverless egress policy (T5)
+
+- **Status:** Pending
+- **Outcome:** Serverless compute in the workspace reaches only the Aura hosts and the package index.
+- **Checklist:**
+  - [ ] Confirm that the workspace tier supports serverless egress control.
+  - [ ] Add the network policy and workspace binding to the NCC stack. Feed it the existing Aura hostname variables and a new package-host variable.
+  - [ ] Start in dry-run mode if the provider exposes it. Otherwise apply in a non-production workspace first.
+  - [ ] Review the denial logs and add any host this workload needs.
+  - [ ] Switch to enforced mode.
+  - [ ] Document the rollback, which rebinds the workspace to the default policy.
+- **Validation:**
+  - The validation notebook passes, including its `%pip install`.
+  - `notebooks/04_smoke_test.py` passes its write and read-back.
+  - A serverless notebook request to a host outside the list, such as `https://example.com`, fails.
+  - Denied requests appear in the outbound network system table. Confirm the table name in your workspace.
+
+### Phase 4: PE stack DNS and NSG (T6, T7)
+
+- **Status:** Pending
+- **Outcome:** Every routing host resolves to the PE private IP from linked VNets. Only allowed client subnets reach the PE.
+- **Checklist:**
+  - [ ] Add the routing-hostname variable, the per-domain zones, the VNet links, and the A records. Gate all of them on `manage_private_dns`.
+  - [ ] Import or remove any hand-made routing records from earlier runs, so Terraform owns them.
+  - [ ] Add the opt-in NSG, its subnet association, and the network policy precondition. Fix the subnet variable description.
+  - [ ] Point the routing-host steps in `docs/private-endpoint-stack-setup.md` at the new variable.
+- **Validation:**
+  - From a VM in a linked VNet, `nslookup` returns the PE private IP for the instance host and each routing host.
+  - A Bolt connection that follows the routing table succeeds.
+  - With the NSG on, a VM in an allowed subnet connects and a VM in another subnet times out.
+  - The plan fails with a clear message against a subnet with network policies off.
+
+### Phase 5: Jump box hardening (T8, T9, T10)
+
+- **Status:** Pending
+- **Outcome:** Relays listen only on localhost and run unprivileged. The image is pinned. Sign-in uses Entra ID.
+- **Checklist:**
+  - [ ] Add `bind=127.0.0.1` and the systemd hardening options to each relay unit.
+  - [ ] Add an image version variable set to the current image. Enable unattended upgrades.
+  - [ ] Register `EncryptionAtHost` on the subscription, then enable encryption at host.
+  - [ ] Add the Entra SSH extension and identity. Grant the VM login role to the operator group. Fix the `ssh_public_key` description.
+  - [ ] Update `docs/developer-desktop-access.md` for Entra SSH sign-in.
+- **Validation:**
+  - On the VM, the relay ports listen on `127.0.0.1` only and run as a non-root user.
+  - The Bastion tunnel with SSH `-L` forwards still reaches Neo4j Browser and Bolt.
+  - From another VM in the VNet, the relay ports are unreachable.
+  - `az ssh vm` through Bastion signs in with an Entra account.
+  - The VM reports encryption at host as enabled.
+
+### Phase 6: Locks, diagnostics, and alerts (T11)
+
+- **Status:** Pending
+- **Outcome:** Key resources resist accidental deletion, and changes to them raise an alert.
+- **Checklist:**
+  - [ ] Add `CanNotDelete` locks on the PE, the DNS zones, and the jump box.
+  - [ ] Add a Log Analytics workspace variable. Send Bastion audit logs and the Activity Log there.
+  - [ ] Add activity log alerts for PE and NSG writes and deletes.
+  - [ ] Add the jump box auto-shutdown schedule.
+  - [ ] Add the lock removal step to `docs/teardown.md`.
+- **Validation:**
+  - `az lock list` shows each lock.
+  - A test NSG rule edit fires the alert.
+  - A Bastion session appears in the Log Analytics workspace.
+  - The updated teardown steps work with the locks in place.
+
+### Completion criteria
+
+- T1 to T11 are applied in every deployed stack, or marked skipped with a reason.
+- Each phase's validation passed, and its status records the result.
+- A final clean run of `automate.py` prints `SUCCESS` with the egress policy enforced.
+- `trivy config` and `checkov` on `infra/` show no unresolved High findings.
+- The findings table marks H2, M1, M5, M6, M7, M9, M10, L1, L2, and L5 as fixed.
 
 ## Limits of this review
 

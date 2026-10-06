@@ -19,7 +19,7 @@ then re-run).
   starting at *Prerequisites*.
 - **Rebuilding a half-configured workspace** (stale NCCs, an expired rule, a wrong-region
   binding left from an earlier attempt): tear down the existing wiring **first** (see
-  [Teardown](docs/teardown.md)), then return here and run the orchestrator. Running the
+  [Teardown](teardown.md)), then return here and run the orchestrator. Running the
   flow below against half-configured state operates on a broken binding and will not
   converge.
 
@@ -36,40 +36,50 @@ then re-run).
    az account set --subscription <SUB_ID>
    ```
 
-   To find the tenant ID in the Azure portal, open **Microsoft Entra ID** and read **Tenant ID**
-   under **Basic information** on the **Overview** page. From the CLI, run
-   `az account show --query tenantId -o tsv`. Use the tenant that owns the subscription your
-   Databricks workspace is deployed in. The subscription ID is a separate value, listed under
-   **Subscriptions** in the portal.
+   - **Tenant ID:** In the Azure portal, open **Microsoft Entra ID** and read **Tenant ID**
+     under **Basic information** on the **Overview** page. From the CLI, run
+     `az account show --query tenantId -o tsv`. Use the tenant that owns the subscription your
+     Databricks workspace is deployed in.
+   - **Subscription ID:** This is a separate value, listed under **Subscriptions** in the
+     portal.
 
-3. **Workspace CLI profile** (default `azure-rk-knight`) exists and authenticates:
+3. **Workspace CLI profile** exists and authenticates. The commands below use
+   `<workspace-profile>` for its name:
 
    ```bash
-   databricks --profile azure-rk-knight current-user me
+   databricks --profile <workspace-profile> current-user me
    ```
 
    If it reports stored credentials from an older CLI version, sign in again:
 
    ```bash
-   databricks auth login --host https://adb-1098933906466604.4.azuredatabricks.net --profile azure-rk-knight
+   databricks auth login --host <WORKSPACE_URL> --profile <workspace-profile>
    ```
 
 4. **Account-console CLI profile.** NCC rule polling targets `accounts.azuredatabricks.net`,
-   a different auth context from the workspace. Configure it once:
+   a different auth context from the workspace. Configure it once. The commands below use
+   `<account-profile>` for its name:
 
    ```bash
-   databricks auth login --host https://accounts.azuredatabricks.net --account-id 16604dc9-1c39-4d73-95a3-7d75ce00a12b --profile azure-neo4j-account
+   databricks auth login --host https://accounts.azuredatabricks.net --account-id <ACCOUNT_ID> --profile <account-profile>
    ```
 
-   Verify it lists NCCs (this repo uses the `azure-neo4j-account` profile):
+   Verify it lists NCCs:
 
    ```bash
-   databricks --profile azure-neo4j-account account network-connectivity list-network-connectivity-configurations
+   databricks --profile <account-profile> account network-connectivity list-network-connectivity-configurations
    ```
+
+   Any JSON list counts as a pass. Check that each entry shows the `account_id` from the login
+   command above. An auth or permission error means the profile cannot reach the account
+   console. The NCCs listed are existing ones in the account, including expired or other
+   people's rules. Leave them alone, because Terraform creates a new NCC for this run.
 
 5. **Terraform variables.** Populate `infra/terraform/databricks-ncc/terraform.tfvars` from
    the example, confirming the account id, workspace id/url, region, Aura PLS alias, and Aura
-   hostname:
+   hostname. The Aura PLS alias and hostname come from the Aura console, so first follow the
+   [README Prerequisites](../README.md#prerequisites) and
+   [Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration):
 
    ```bash
    # if not already present, then edit:
@@ -100,7 +110,7 @@ different Aura instance, the secrets step will repopulate it and can break whate
 it. Inspect it first:
 
 ```bash
-databricks --profile azure-rk-knight secrets list-secrets neo4j
+databricks --profile <workspace-profile> secrets list-secrets neo4j
 ```
 
 - If the scope is absent, or already holds `uri`, `username`, `password`, `database` for the
@@ -113,7 +123,7 @@ databricks --profile azure-rk-knight secrets list-secrets neo4j
 To remove a stale scope, either delete it by hand:
 
 ```bash
-databricks --profile azure-rk-knight secrets delete-scope neo4j
+databricks --profile <workspace-profile> secrets delete-scope neo4j
 ```
 
 or pass `--reset-secret-scope` on the run, which deletes the scope and recreates it from the
@@ -121,7 +131,7 @@ or pass `--reset-secret-scope` on the run, which deletes the scope and recreates
 never removes a scope it cannot repopulate):
 
 ```bash
-uv run scripts/automate.py run --account-profile azure-neo4j-account --reset-secret-scope
+uv run scripts/automate.py run --account-profile <account-profile> --workspace-profile <workspace-profile> --reset-secret-scope
 ```
 
 ---
@@ -133,11 +143,11 @@ uv run scripts/automate.py run --account-profile azure-neo4j-account --reset-sec
 From the repo root:
 
 ```bash
-uv run scripts/automate.py run --account-profile azure-neo4j-account
+uv run scripts/automate.py run --account-profile <account-profile> --workspace-profile <workspace-profile>
 ```
 
-The workspace profile defaults to `azure-rk-knight`; pass `--workspace-profile <name>` to
-change it.
+If you omit `--workspace-profile`, it defaults to `azure-rk-knight`, the author's profile.
+Pass your own.
 
 On the first run the Terraform apply is expected to fail with the subscription allow-list
 gotcha. That is by design and produces pause #1 below.
@@ -151,12 +161,12 @@ not yet trust. The orchestrator prints the managed subscription GUID and exits w
 
 Do this, then re-run:
 
-1. Open the Aura private endpoints page, as described in [README Step 2](README.md#step-2-enable-private-link-in-aura-network-access-configuration).
+1. Open the Aura private endpoints page, as described in [README Step 6](../README.md#step-6-add-a-private-endpoint-rule-for-neo4j-aura-pls).
 2. Add the printed subscription GUID to **Target Azure Subscription IDs**.
 3. Re-run the same command:
 
    ```bash
-   uv run scripts/automate.py run --account-profile azure-neo4j-account
+   uv run scripts/automate.py run --account-profile <account-profile> --workspace-profile <workspace-profile>
    ```
 
 Databricks may retry from more than one managed subscription per region, so this can iterate.
@@ -170,7 +180,7 @@ the approval instruction and exits `2` if it does not reach `ESTABLISHED` within
 
 Do this, then re-run:
 
-1. Approve the private endpoint in the Aura console, as described in [README Step 7](README.md#step-7-approve-the-private-endpoint-in-the-aura-console).
+1. Approve the private endpoint in the Aura console, as described in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console).
 2. Re-run the same command. The poller observes `ESTABLISHED` and continues.
 
 A rule left `PENDING` for 14 days expires; the poller warns as it approaches that limit. If a
@@ -197,6 +207,8 @@ After `ESTABLISHED`, the same invocation continues:
 - **Validation notebook.** `notebooks/01_validate_connectivity.py` is imported to
   `/Shared/aura-privatelink/` (overwrite) and submitted as a one-time serverless run. The run
   id prints before the wait, so the run is findable in the Jobs UI. Default wait is 30 minutes.
+  If the run does not finish in time, the tool pauses and exits `2`. Check the run in the Jobs
+  UI, then re-run.
 
 On success the tool prints `SUCCESS` and exits `0`.
 
@@ -209,19 +221,27 @@ If the validation run fails because an Aura routing host does not resolve
 aura_extra_domain_names = ["p-....neo4j.io"]
 ```
 
-The orchestrator is print-only here and does not edit `terraform.tfvars`. Add the line
-yourself in `infra/terraform/databricks-ncc/terraform.tfvars`, then:
+The orchestrator is print-only here and does not edit `terraform.tfvars`. It exits `1`. Add
+the line yourself in `infra/terraform/databricks-ncc/terraform.tfvars`, then re-run. The run
+applies the updated stack itself:
 
 ```bash
-terraform -chdir=infra/terraform/databricks-ncc apply
-uv run scripts/automate.py run --account-profile azure-neo4j-account
+uv run scripts/automate.py run --account-profile <account-profile> --workspace-profile <workspace-profile>
 ```
 
 ### Expected pause count
 
-From a clean workspace, reaching a passing validation run should take **exactly two human
-pauses**, both in the Aura console: the subscription allow-list add and the private endpoint
-approval. More than two is a failure worth investigating.
+From a clean workspace, expect **two kinds of human stop**, both in the Aura console: the
+subscription allow-list add and the private endpoint approval.
+
+You may stop more often in two cases:
+
+- **Several managed subscriptions.** Databricks can retry from more than one managed
+  subscription, so the allow-list pause can repeat once per GUID.
+- **Routing hosts.** If Aura returns routing hosts, the routing-host fallback adds one more
+  stop to edit `terraform.tfvars`.
+
+Any other stop is a failure worth investigating.
 
 ---
 
@@ -231,7 +251,7 @@ approval. More than two is a failure worth investigating.
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--account-profile` | (required for polling) | CLI profile for `accounts.azuredatabricks.net`. |
+| `--account-profile` | (required) | CLI profile for `accounts.azuredatabricks.net`. Every run polls the rule, including `--no-apply`. |
 | `--workspace-profile` | `azure-rk-knight` | CLI profile for the target workspace. |
 | `--no-apply` | off | Skip `terraform apply`; only read `terraform output -json`. |
 | `--notebook PATH` | `notebooks/01_validate_connectivity.py` | Validation notebook to run. |
@@ -247,8 +267,9 @@ To re-check outputs and re-run validation without applying infrastructure (for e
 success), skip the apply:
 
 ```bash
-uv run scripts/automate.py run --no-apply --account-profile azure-neo4j-account
+uv run scripts/automate.py run --no-apply --skip-warehouse-restart --account-profile <account-profile> --workspace-profile <workspace-profile>
 ```
 
 This reads `terraform output -json` instead of applying. It fails with a clear message if the
-stack has not been applied yet.
+stack has not been applied yet. `--no-apply` alone still restarts running SQL warehouses, so
+add `--skip-warehouse-restart` to leave them untouched.

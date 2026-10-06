@@ -91,7 +91,7 @@ output "next_steps" {
     2. Wait until the rule reads ESTABLISHED in the Databricks NCC view
        (refresh the account console; can take a few minutes).
     3. Restart any running serverless compute (SQL warehouses, running jobs).
-    4. Run notebooks/03_smoke_test.py from your workspace
+    4. Run notebooks/04_smoke_test.py from your workspace
        to validate the private path end-to-end.
   EOT
 }

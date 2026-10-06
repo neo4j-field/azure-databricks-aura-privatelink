@@ -20,6 +20,9 @@
 
 # COMMAND ----------
 
+import re
+from urllib.parse import urlparse
+
 from neo4j import GraphDatabase
 from neo4j.exceptions import ServiceUnavailable, TransientError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -30,9 +33,38 @@ NEO4J_USER     = dbutils.secrets.get(scope="neo4j", key="username")
 NEO4J_PASSWORD = dbutils.secrets.get(scope="neo4j", key="password")
 NEO4J_DATABASE = "neo4j"
 
-SOURCE_TABLE   = "main.demo.customers"        # change to your Delta table
-TARGET_TABLE   = "main.demo.customer_metrics" # round-trip output
-BATCH_SIZE     = 5000
+CATALOG        = "pldemo"
+SOURCE_TABLE   = f"{CATALOG}.demo.customers"        # change to your Delta table
+TARGET_TABLE   = f"{CATALOG}.demo.customer_metrics" # round-trip output
+BATCH_SIZE     = 500
+
+# COMMAND ----------
+
+# MAGIC %md ## 0. (Optional) Create synthetic source table
+# MAGIC
+# MAGIC Skip this if `SOURCE_TABLE` already exists. The cell only creates the table when it is
+# MAGIC missing, so it never overwrites real data.
+
+# COMMAND ----------
+
+if not spark.catalog.tableExists(SOURCE_TABLE):
+    schema = SOURCE_TABLE.split(".")[1]
+    spark.sql(f"CREATE SCHEMA IF NOT EXISTS {CATALOG}.{schema}")
+
+    (spark.range(1000)
+        .select(
+            (F.col("id") + 1).alias("customer_id"),
+            F.concat(F.lit("Customer "), (F.col("id") + 1).cast("string")).alias("name"),
+            F.when(F.col("id") % 3 == 0, F.lit("uksouth"))
+             .when(F.col("id") % 3 == 1, F.lit("northeurope"))
+             .otherwise(F.lit("westeurope")).alias("region"),
+            (F.current_timestamp() - F.expr("make_interval(0, 0, 0, CAST(id % 365 AS INT))"))
+                .alias("signup_ts"),
+        )
+        .write.saveAsTable(SOURCE_TABLE))
+    print(f"Created {SOURCE_TABLE}")
+else:
+    print(f"{SOURCE_TABLE} already exists, leaving it untouched")
 
 # COMMAND ----------
 
@@ -60,7 +92,23 @@ print(f"Source rows: {row_count}")
 
 # COMMAND ----------
 
-driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+def make_resolver(uri):
+    # Aura VDC advertises p-<dbid>-*.neo4j.io routing hosts that do not resolve on
+    # Databricks serverless. Map them to the private Aura host that NCC resolves.
+    host = urlparse(uri).hostname
+    pattern = re.compile(rf"^p-{re.escape(host.split('.')[0])}-.*\.neo4j\.io$")
+
+    def resolver(address):
+        mapped_host = host if pattern.match(address.host) else address.host
+        return [(mapped_host, address.port)]
+
+    return resolver
+
+driver = GraphDatabase.driver(
+    NEO4J_URI,
+    auth=(NEO4J_USER, NEO4J_PASSWORD),
+    resolver=make_resolver(NEO4J_URI),
+)
 
 MERGE_CYPHER = """
 UNWIND $rows AS row
@@ -71,26 +119,32 @@ SET c.name      = row.name,
     c.updated_at = datetime()
 """
 
-@retry(
-    stop=stop_after_attempt(5),
-    wait=wait_exponential(multiplier=1, min=1, max=16),
-    retry=retry_if_exception_type((ServiceUnavailable, TransientError)),
-    reraise=True,
-)
-def write_batch(rows):
-    with driver.session(database=NEO4J_DATABASE) as session:
-        session.execute_write(lambda tx: tx.run(MERGE_CYPHER, rows=rows).consume())
-
 def write_partition(partition_iter):
-    batch = []
-    for row in partition_iter:
-        batch.append(row.asDict())
-        if len(batch) >= BATCH_SIZE:
-            write_batch(batch)
-            batch = []
-    if batch:
-        write_batch(batch)
-    return iter([])
+    # Runs on the executors: open a driver per partition and build the retry here,
+    # because the driver and tenacity state hold locks that cannot be pickled.
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=16),
+        retry=retry_if_exception_type((ServiceUnavailable, TransientError)),
+        reraise=True,
+    )
+    def write_batch(conn, rows):
+        with conn.session(database=NEO4J_DATABASE) as session:
+            session.execute_write(lambda tx: tx.run(MERGE_CYPHER, rows=rows).consume())
+
+    with GraphDatabase.driver(
+        NEO4J_URI,
+        auth=(NEO4J_USER, NEO4J_PASSWORD),
+        resolver=make_resolver(NEO4J_URI),
+    ) as conn:
+        batch = []
+        for row in partition_iter:
+            batch.append(row.asDict())
+            if len(batch) >= BATCH_SIZE:
+                write_batch(conn, batch)
+                batch = []
+        if batch:
+            write_batch(conn, batch)
 
 df.foreachPartition(write_partition)
 print("Write phase complete.")

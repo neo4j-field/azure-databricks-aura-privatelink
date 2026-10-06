@@ -10,7 +10,7 @@
 
 ```bash
 curl --location --request PATCH \
-  "https://accounts.azuredatabricks.net/api/2.0/accounts/${ACCOUNT_ID}/network-connectivity-configs/${NCC_ID}/private-endpoint-rules/${RULE_ID}?update_mask=domain_names" \
+  "https://accounts.azuredatabricks.net/api/2.0/accounts/${DATABRICKS_ACCOUNT_ID}/network-connectivity-configs/${NCC_ID}/private-endpoint-rules/${RULE_ID}?update_mask=domain_names" \
   --header "Authorization: Bearer ${DATABRICKS_TOKEN}" \
   --header "Content-Type: application/json" \
   --data '{ "domain_names": ["<dbid>.databases.neo4j.io"] }'

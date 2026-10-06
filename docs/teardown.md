@@ -25,10 +25,10 @@ The workspace must always point at *some* NCC, so free the original by pointing 
 
 **Account console:** Workspaces → your workspace → **Update workspace** → under **Network connectivity configurations** pick a different NCC (create an empty one first if you have none) → **Update**.
 
-**REST API** (mirrors [Step 6](../README.md#step-6-add-a-private-endpoint-rule-for-neo4j-aura-pls) of the README; `ACCOUNT_ID`, `WORKSPACE_ID`, and a `DATABRICKS_TOKEN` bearer for `accounts.azuredatabricks.net`):
+**REST API** (mirrors [Step 6](../README.md#step-6-add-a-private-endpoint-rule-for-neo4j-aura-pls) of the README; `DATABRICKS_ACCOUNT_ID`, `WORKSPACE_ID`, and a `DATABRICKS_TOKEN` bearer for `accounts.azuredatabricks.net`):
 
 ```bash
-BASE="https://accounts.azuredatabricks.net/api/2.0/accounts/${ACCOUNT_ID}"
+BASE="https://accounts.azuredatabricks.net/api/2.0/accounts/${DATABRICKS_ACCOUNT_ID}"
 
 # a. Create an empty placeholder NCC in the workspace's region.
 PLACEHOLDER=$(curl -s -X POST "${BASE}/network-connectivity-configs" \

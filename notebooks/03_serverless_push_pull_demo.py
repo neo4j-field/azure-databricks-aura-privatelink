@@ -22,6 +22,9 @@
 
 # COMMAND ----------
 
+import re
+from urllib.parse import urlparse
+
 from neo4j import GraphDatabase
 from pyspark.sql import functions as F
 
@@ -61,7 +64,23 @@ display(push_df)
 
 # COMMAND ----------
 
-driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+def make_resolver(uri):
+    # Aura VDC advertises p-<dbid>-*.neo4j.io routing hosts that do not resolve on
+    # Databricks serverless. Map them to the private Aura host that NCC resolves.
+    host = urlparse(uri).hostname
+    pattern = re.compile(rf"^p-{re.escape(host.split('.')[0])}-.*\.neo4j\.io$")
+
+    def resolver(address):
+        mapped_host = host if pattern.match(address.host) else address.host
+        return [(mapped_host, address.port)]
+
+    return resolver
+
+driver = GraphDatabase.driver(
+    NEO4J_URI,
+    auth=(NEO4J_USER, NEO4J_PASSWORD),
+    resolver=make_resolver(NEO4J_URI),
+)
 
 MERGE_CYPHER = f"""
 UNWIND $rows AS row

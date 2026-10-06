@@ -9,7 +9,7 @@ terraform {
   }
 }
 
-# Account-level provider — for NCC, private endpoint rule, and NCC binding.
+# Account-level provider: for NCC, private endpoint rule, and NCC binding.
 # Authenticate with the Azure Databricks account via service principal that is
 # an account admin. Account-level Terraform must target the accounts host.
 provider "databricks" {
@@ -91,7 +91,7 @@ output "next_steps" {
     2. Wait until the rule reads ESTABLISHED in the Databricks NCC view
        (refresh the account console; can take a few minutes).
     3. Restart any running serverless compute (SQL warehouses, running jobs).
-    4. Run notebooks/03_dbxuk_svrless_drose_smoke_test.py from your workspace
+    4. Run notebooks/03_smoke_test.py from your workspace
        to validate the private path end-to-end.
   EOT
 }

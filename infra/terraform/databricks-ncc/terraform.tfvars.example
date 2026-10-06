@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------
 # Copy to terraform.tfvars (gitignored) and fill in real values before applying.
-# This stack is for Azure Databricks Serverless. For customer-managed PE flows
-# (classic clusters, AKS, ADF, jump VMs), use ../azure-private-endpoint/.
+# This is the NCC stack, for Azure Databricks Serverless. For the Private
+# Endpoint stack (classic clusters, AKS, ADF, jump VMs), use ../azure-private-endpoint/.
 # ----------------------------------------------------------------------------
 
 # ---- Databricks account / workspace ----------------------------------------
@@ -49,7 +49,7 @@ aura_pls_resource_id = "REPLACE_WITH_AURA_PLS_ALIAS"
 # neo4j+s://<dbid>.databases.neo4j.io). For third-party PLS the provider
 # expects only `resource_id` + `domain_names`; `group_id` is reserved for
 # first-party Azure services and must not be set here.
-aura_private_hostname = "REPLACE_WITH_AURA_PRIVATE_HOSTNAME"   # e.g., b7253d3b.databases.neo4j.io
+aura_private_hostname = "REPLACE_WITH_AURA_PRIVATE_HOSTNAME"   # e.g., abcd1234.databases.neo4j.io
 
 # Optional: add any hostnames returned by the Neo4j driver routing table. Aura
 # VDC can advertise p-*.neo4j.io Bolt addresses that the client also needs to

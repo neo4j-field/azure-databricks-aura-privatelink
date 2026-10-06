@@ -8,7 +8,7 @@
 # The account console UI does NOT support `domain_names`, which is required for
 # DNS routing of third-party PLS hostnames from serverless compute. This is the
 # canonical path documented in Microsoft Learn under "Configure Private Link to
-# Azure App Gateway v2" — the same shape works for any third-party PLS.
+# Azure App Gateway v2". The same shape works for any third-party PLS.
 #
 # Usage:
 #   export DATABRICKS_HOST=https://accounts.azuredatabricks.net
@@ -16,9 +16,9 @@
 #   export DATABRICKS_TOKEN=...
 #   export NCC_ID=...
 #   export AURA_PLS_ALIAS="pls-aura-xxx.guid.region.azure.privatelinkservice"
-#   export AURA_PRIVATE_HOSTNAME="d48d6199.databases.neo4j.io"
+#   export AURA_PRIVATE_HOSTNAME="<aura-id>.databases.neo4j.io"
 #   # Optional, comma-separated Neo4j routing hosts returned by the driver:
-#   export AURA_EXTRA_DOMAIN_NAMES="p-d48d6199-....neo4j.io"
+#   export AURA_EXTRA_DOMAIN_NAMES="p-<aura-id>-<suffix>.<orch>.neo4j.io"
 #   ./scripts/create-private-endpoint-rule.sh
 
 set -euo pipefail

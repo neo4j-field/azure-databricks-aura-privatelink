@@ -13,13 +13,13 @@ then re-run).
 
 ---
 
-## Start here — pick your path
+## Start here: pick your path
 
 - **Clean or new workspace** (no prior NCC wiring): follow this document top to bottom,
   starting at *Prerequisites*.
 - **Rebuilding a half-configured workspace** (stale NCCs, an expired rule, a wrong-region
   binding left from an earlier attempt): tear down the existing wiring **first** (see
-  [Teardown](README.md#teardown)), then return here and run the orchestrator. Running the
+  [Teardown](docs/teardown.md)), then return here and run the orchestrator. Running the
   flow below against half-configured state operates on a broken binding and will not
   converge.
 

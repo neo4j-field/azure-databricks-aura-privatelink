@@ -1,7 +1,8 @@
 # ----------------------------------------------------------------------------
 # Copy to terraform.tfvars (gitignored) and fill in real values before applying.
-# This stack is for customer-managed consumers (classic Databricks clusters,
-# AKS, ADF, jump VMs). For Databricks Serverless, use ../databricks-ncc/.
+# This is the Private Endpoint stack, for consumers in your own VNet (classic
+# Databricks clusters, AKS, ADF, jump VMs). For Databricks Serverless, use the
+# NCC stack, ../databricks-ncc/.
 # ----------------------------------------------------------------------------
 
 azure_subscription_id = "REPLACE_WITH_SUBSCRIPTION_ID"
@@ -16,13 +17,13 @@ vnet_resource_group_name = null                                # set only if the
 pe_subnet_name           = "REPLACE_WITH_PE_SUBNET_NAME"      # e.g., snet-private-endpoints
 
 # Name of the PE resource itself. Recommended pattern:
-#   pe-<aura-instance-id>-<pe-region>     e.g. pe-b7253d3b-eastus
+#   pe-<aura-instance-id>-<pe-region>     e.g. pe-abcd1234-eastus
 # It is a hint, not enforced. Keep it lowercase and hyphen-delimited.
 private_endpoint_name = "REPLACE_WITH_PE_NAME"
 
 # Aura targets — from Aura console -> Security -> Network Access.
 aura_pls_alias   = "REPLACE_WITH_AURA_PLS_ALIAS"              # e.g., production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
-aura_instance_id = "REPLACE_WITH_AURA_INSTANCE_ID"            # the dbid, e.g., b7253d3b
+aura_instance_id = "REPLACE_WITH_AURA_INSTANCE_ID"            # the dbid, e.g., abcd1234
 
 # Create the `databases.neo4j.io` private DNS zone + VNet link + A record in
 # this stack. Set to false if you manage DNS centrally (e.g., hub-and-spoke

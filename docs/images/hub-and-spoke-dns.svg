@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" role="img">
+  <title>Hub-and-spoke private DNS for the Aura hostname</title>
+  <defs><marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/></marker><marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5C6470"/></marker><marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C42B12"/></marker><marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E6DB4"/></marker><marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E8B57"/></marker><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/></filter></defs>
+  <rect x="10" y="10" width="980" height="500" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <rect x="900" y="34" width="10" height="10" rx="2" fill="#2E6DB4"/><text x="918" y="43" font-size="12" fill="#16233A">Neo4j</text><rect x="754" y="34" width="10" height="10" rx="2" fill="#8A8A8A"/><text x="772" y="43" font-size="12" fill="#16233A">Azure / customer</text>
+  <rect x="40" y="64" width="920" height="140" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M40,104 V78 a14,14 0 0 1 14,-14 H946 a14,14 0 0 1 14,14 V104 Z" fill="#5C6470"/>
+  <path d="M60,79 L65,84 L60,89 L55,84 Z" fill="#FFFFFF"/>
+  <text x="76" y="89" font-size="14.5" fill="#FFFFFF" font-weight="bold">Hub VNet</text>
+  <rect x="270" y="118" width="460" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="500.0" y="143.0" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Azure Private DNS zones</text>
+  <text x="500.0" y="163.0" font-size="10" fill="#5C6470" text-anchor="middle">the one place that owns databases.neo4j.io</text>
+  <text x="500.0" y="178.0" font-size="10" fill="#5C6470" text-anchor="middle">optional DNS Private Resolver</text>
+  <path d="M200,207 V289" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <path d="M500,207 V289" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <path d="M800,207 V289" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <text x="514" y="252" font-size="10" fill="#16233A">VNet peering + zone links</text>
+  <rect x="70" y="292" width="260" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="200.0" y="324.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Spoke VNet</text>
+  <text x="200.0" y="344.5" font-size="10" fill="#5C6470" text-anchor="middle">Classic Databricks</text>
+  <rect x="370" y="292" width="260" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="500.0" y="324.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Spoke VNet</text>
+  <text x="500.0" y="344.5" font-size="10" fill="#5C6470" text-anchor="middle">ADF</text>
+  <rect x="670" y="292" width="260" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="800.0" y="324.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Spoke VNet</text>
+  <text x="800.0" y="344.5" font-size="10" fill="#5C6470" text-anchor="middle">AKS</text>
+  <path d="M200,365 V409" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <rect x="70" y="412" width="260" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="200.0" y="444.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Private Endpoint</text>
+  <text x="200.0" y="464.5" font-size="10" fill="#5C6470" text-anchor="middle">the private IP lives here</text>
+  <path d="M333,447 H427" fill="none" stroke="#2E6DB4" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+  <text x="380" y="439" font-size="10" fill="#16233A" text-anchor="middle">Private Link</text>
+  <rect x="430" y="412" width="260" height="70" rx="10" fill="#EAF1FA" stroke="#2E6DB4" stroke-width="1.6"/>
+  <text x="560.0" y="444.5" font-size="13" fill="#1F4F8A" text-anchor="middle" font-weight="bold">Aura PLS</text>
+  <text x="560.0" y="464.5" font-size="10" fill="#5E7FA8" text-anchor="middle">Neo4j-managed subscription</text>
+</svg>

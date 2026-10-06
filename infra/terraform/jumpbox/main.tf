@@ -55,7 +55,7 @@ data "azurerm_subnet" "jump" {
 }
 
 # ---------------------------------------------------------------------------
-# AzureBastionSubnet — Azure requires this exact subnet name.
+# AzureBastionSubnet. Azure requires this exact subnet name.
 # ---------------------------------------------------------------------------
 
 resource "azurerm_subnet" "bastion" {
@@ -66,7 +66,7 @@ resource "azurerm_subnet" "bastion" {
 }
 
 # ---------------------------------------------------------------------------
-# Azure Bastion host (Standard SKU — required for az network bastion tunnel).
+# Azure Bastion host (Standard SKU, required for az network bastion tunnel).
 # The public IP is on the Bastion, not on any VM.
 # ---------------------------------------------------------------------------
 
@@ -94,7 +94,7 @@ resource "azurerm_bastion_host" "this" {
 }
 
 # ---------------------------------------------------------------------------
-# NSG for the jump box — SSH allowed only from AzureBastionSubnet.
+# NSG for the jump box: SSH allowed only from AzureBastionSubnet.
 # ---------------------------------------------------------------------------
 
 resource "azurerm_network_security_group" "jumpbox" {
@@ -129,7 +129,7 @@ resource "azurerm_network_security_group" "jumpbox" {
 }
 
 # ---------------------------------------------------------------------------
-# Jump box NIC — no public IP.
+# Jump box NIC: no public IP.
 # ---------------------------------------------------------------------------
 
 resource "azurerm_network_interface" "jumpbox" {
@@ -151,7 +151,7 @@ resource "azurerm_network_interface_security_group_association" "jumpbox" {
 }
 
 # ---------------------------------------------------------------------------
-# Jump box VM — no public IP, socat proxies installed via custom_data.
+# Jump box VM: no public IP, socat proxies installed via custom_data.
 # ---------------------------------------------------------------------------
 
 resource "azurerm_linux_virtual_machine" "jumpbox" {
@@ -183,6 +183,6 @@ resource "azurerm_linux_virtual_machine" "jumpbox" {
     version   = "latest"
   }
 
-  # Disable password authentication — SSH key only.
+  # Disable password authentication: SSH key only.
   disable_password_authentication = true
 }

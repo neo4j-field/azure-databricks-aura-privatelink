@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="330" viewBox="0 0 1200 330" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" role="img">
+  <title>Databricks Serverless to Neo4j Aura over Azure Private Link</title>
+  <defs><marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/></marker><marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5C6470"/></marker><marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C42B12"/></marker><marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E6DB4"/></marker><marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E8B57"/></marker><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/></filter></defs>
+  <rect x="10" y="10" width="1180" height="310" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <rect x="1100" y="34" width="10" height="10" rx="2" fill="#2E6DB4"/><text x="1118" y="43" font-size="12" fill="#16233A">Neo4j</text><rect x="993" y="34" width="10" height="10" rx="2" fill="#E1503A"/><text x="1011" y="43" font-size="12" fill="#16233A">Databricks</text>
+  <rect x="40" y="64" width="520" height="180" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M40,104 V78 a14,14 0 0 1 14,-14 H546 a14,14 0 0 1 14,14 V104 Z" fill="#E1503A"/>
+  <path d="M60,79 L65,84 L60,89 L55,84 Z" fill="#FFFFFF"/>
+  <text x="76" y="89" font-size="14.5" fill="#FFFFFF" font-weight="bold">Databricks-managed subscription</text>
+  <rect x="640" y="64" width="520" height="180" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M640,104 V78 a14,14 0 0 1 14,-14 H1146 a14,14 0 0 1 14,14 V104 Z" fill="#2E6DB4"/>
+  <path d="M660,79 L665,84 L660,89 L655,84 Z" fill="#FFFFFF"/>
+  <text x="676" y="89" font-size="14.5" fill="#FFFFFF" font-weight="bold">Neo4j-managed subscription</text>
+  <rect x="60" y="128" width="210" height="90" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="165.0" y="170.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Notebook / Job / SQL</text>
+  <text x="165.0" y="190.5" font-size="10" fill="#5C6470" text-anchor="middle">Serverless compute plane</text>
+  <path d="M273,173 H327" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <text x="300" y="165" font-size="10" fill="#16233A" text-anchor="middle">Bolt+TLS</text>
+  <rect x="330" y="128" width="210" height="90" rx="10" fill="#FDF2EF" stroke="#E1503A" stroke-width="1.5"/>
+  <text x="435.0" y="163.0" font-size="13" fill="#C42B12" text-anchor="middle" font-weight="bold">NCC private endpoint</text>
+  <text x="435.0" y="183.0" font-size="10" fill="#A8776C" text-anchor="middle">managed DNS routes the</text>
+  <text x="435.0" y="198.0" font-size="10" fill="#A8776C" text-anchor="middle">Aura hostname to it</text>
+  <path d="M543,173 H657" fill="none" stroke="#5C6470" stroke-width="2" marker-end="url(#arrow-dark)"/>
+  <text x="600" y="150" font-size="10.5" fill="#16233A" text-anchor="middle" font-weight="bold">Azure</text>
+  <text x="600" y="163" font-size="10.5" fill="#16233A" text-anchor="middle" font-weight="bold">backbone</text>
+  <text x="600" y="192" font-size="10" fill="#5C6470" text-anchor="middle">private</text>
+  <rect x="660" y="128" width="210" height="90" rx="10" fill="#EAF1FA" stroke="#2E6DB4" stroke-width="1.6"/>
+  <text x="765.0" y="163.0" font-size="13" fill="#1F4F8A" text-anchor="middle" font-weight="bold">Aura PLS</text>
+  <text x="765.0" y="183.0" font-size="10" fill="#5E7FA8" text-anchor="middle">Private Link Service</text>
+  <text x="765.0" y="198.0" font-size="10" fill="#5E7FA8" text-anchor="middle">forwards the connection</text>
+  <path d="M873,173 H927" fill="none" stroke="#2E6DB4" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+  <rect x="930" y="128" width="210" height="90" rx="10" fill="#EAF1FA" stroke="#2E6DB4" stroke-width="1.6"/>
+  <text x="1035.0" y="163.0" font-size="13" fill="#1F4F8A" text-anchor="middle" font-weight="bold">Neo4j Aura VDC</text>
+  <text x="1035.0" y="183.0" font-size="10" fill="#5E7FA8" text-anchor="middle">terminates TLS with</text>
+  <text x="1035.0" y="198.0" font-size="10" fill="#5E7FA8" text-anchor="middle">its real certificate</text>
+  <rect x="40" y="266" width="1120" height="38" rx="10" fill="#EEF1F5" stroke="#C3CAD3" stroke-width="1"/>
+  <text x="600.0" y="291" font-size="13" fill="#2E3540" text-anchor="middle" font-family="Menlo, monospace">Bolt+TLS (port 7687)  ·  Azure Private Link  ·  no public internet</text>
+</svg>

@@ -50,7 +50,7 @@ TEST_BATCH_TAG  = f"smoke-test-{int(time.time())}"
 SAMPLE_ROWS     = 100
 BATCH_SIZE      = 25
 
-print(f"URI host : {EXPECTED_HOST}")
+print("URI host : [REDACTED]")
 print(f"User     : {NEO4J_USER}")
 print(f"Run tag  : {TEST_BATCH_TAG}")
 

@@ -247,4 +247,4 @@ print("Cleanup complete.")
 # COMMAND ----------
 
 driver.close()
-print(f"Smoke test PASSED: Databricks Serverless <-> Aura {EXPECTED_HOST} over PrivateLink is healthy.")
+print("Smoke test PASSED: Databricks Serverless <-> Aura over PrivateLink is healthy.")

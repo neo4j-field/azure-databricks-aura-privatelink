@@ -17,7 +17,7 @@ provider "azurerm" {
 
 # ----------------------------------------------------------------------------
 # Looks up the existing resource group and target subnet. We never create these
-# here — they must already exist and be owned by the consumer team.
+# here. They must already exist and be owned by the consumer team.
 # ----------------------------------------------------------------------------
 data "azurerm_resource_group" "this" {
   name = var.resource_group_name
@@ -36,7 +36,7 @@ data "azurerm_subnet" "pe_subnet" {
 
 # ----------------------------------------------------------------------------
 # Private DNS zone for Aura's databases.neo4j.io hostname. NCC manages DNS on
-# the serverless side; for customer-managed consumers we must create a private
+# the serverless side; in the Private Endpoint stack we must create a private
 # DNS zone and link it to the VNet so the Aura hostname resolves to the PE NIC.
 # ----------------------------------------------------------------------------
 resource "azurerm_private_dns_zone" "neo4j" {

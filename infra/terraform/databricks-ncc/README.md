@@ -1,4 +1,4 @@
-# Terraform: Databricks NCC + Aura PLS Private Endpoint Rule
+# Terraform: NCC Stack (Databricks NCC + Aura PLS Private Endpoint Rule)
 
 Provisions, end-to-end on the Databricks side:
 
@@ -6,7 +6,7 @@ Provisions, end-to-end on the Databricks side:
 2. A **private endpoint rule** under the NCC targeting the Neo4j Aura Private Link Service, with `domain_names` set so NCC-managed DNS routes the Aura hostname privately, including optional Neo4j routing hostnames
 3. An **NCC binding** that attaches the NCC to your existing Azure Databricks workspace
 
-Use this stack when your consumer is **Azure Databricks Serverless**. For classic clusters, AKS, ADF, jump VMs, etc., use the sibling stack [`../azure-private-endpoint/`](../azure-private-endpoint/).
+Use this stack (the **NCC stack**) when your consumer is **Azure Databricks Serverless**. For classic clusters, AKS, ADF, jump VMs, etc., use the sibling **Private Endpoint stack** [`../azure-private-endpoint/`](../azure-private-endpoint/).
 
 ## Prerequisites
 
@@ -36,19 +36,19 @@ terraform apply tfplan
 After a successful apply:
 
 1. Approve the incoming PE in the Aura console (*Security → Network Access → Pending approvals*).
-2. Refresh the NCC view in the Databricks account console — the rule status should transition from `PENDING` to `ESTABLISHED` (usually under a minute).
+2. Refresh the NCC view in the Databricks account console. The rule status should transition from `PENDING` to `ESTABLISHED` (usually under a minute).
 3. Restart any running serverless compute in the workspace (SQL warehouses, jobs).
 4. Run a smoke-test notebook from the workspace to validate the private path.
 
 ## Third-party PLS visibility (must-read for Aura)
 
-When the NCC creates the PE on Databricks' side, the request originates from a **Databricks-managed Azure subscription** for the workspace's region — not from your subscription. Aura's PLS enforces a visibility allow-list ("Target Azure Subscription IDs" in the Aura Network Access wizard), and if the Databricks-managed sub isn't on that list, Azure rejects PE creation with:
+When the NCC creates the PE on Databricks' side, the request originates from a **Databricks-managed Azure subscription** for the workspace's region, not from your subscription. Aura's PLS enforces a visibility allow-list ("Target Azure Subscription IDs" in the Aura Network Access wizard), and if the Databricks-managed sub isn't on that list, Azure rejects PE creation with:
 
 ```
 ThirdPartyPrivateLinkServiceProvidedDuringPrivateEndpointCreationDoesNotExistOrIsNotVisible
 ```
 
-The failed `terraform apply` exposes the right sub ID in its error message — look for a path like `/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...`. That `<guid>` is the Databricks-managed sub for that region.
+The failed `terraform apply` exposes the right sub ID in its error message. Look for a path like `/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...`. That `<guid>` is the Databricks-managed sub for that region.
 
 **Fix:**
 
@@ -73,7 +73,7 @@ add the hostname to `aura_extra_domain_names` and re-apply:
 
 ```hcl
 aura_extra_domain_names = [
-  "p-b7253d3b-944d-0005.production-orch-0477.neo4j.io",
+  "p-<aura-id>-<suffix>.<orch>.neo4j.io",
 ]
 ```
 
@@ -81,7 +81,7 @@ Terraform updates the existing private endpoint rule in place by adding the host
 
 ## Why `databricks_mws_ncc_binding` and not `databricks_mws_workspaces`
 
-`databricks_mws_workspaces` is intended for full workspace lifecycle management and is fragile when applied to a workspace that was created out-of-band — it tries to reconcile every workspace attribute it knows about, producing spurious diffs and risking unintended workspace changes. `databricks_mws_ncc_binding` is a narrow, purpose-built resource that only manages the NCC-to-workspace association.
+`databricks_mws_workspaces` is intended for full workspace lifecycle management and is fragile when applied to a workspace that was created out-of-band. It tries to reconcile every workspace attribute it knows about, producing spurious diffs and risking unintended workspace changes. `databricks_mws_ncc_binding` is a narrow, purpose-built resource that only manages the NCC-to-workspace association.
 
 ## Notes
 

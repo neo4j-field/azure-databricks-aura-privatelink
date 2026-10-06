@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="410" viewBox="0 0 1100 410" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" role="img">
+  <title>Why workloads in other VNets fail to resolve the private endpoint</title>
+  <defs><marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/></marker><marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5C6470"/></marker><marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C42B12"/></marker><marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E6DB4"/></marker><marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E8B57"/></marker><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/></filter></defs>
+  <rect x="10" y="10" width="1080" height="390" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <rect x="1000" y="34" width="10" height="10" rx="2" fill="#C42B12"/><text x="1018" y="43" font-size="12" fill="#16233A">Fails</text><rect x="925" y="34" width="10" height="10" rx="2" fill="#2E8B57"/><text x="943" y="43" font-size="12" fill="#16233A">Works</text>
+  <rect x="40" y="64" width="500" height="260" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M40,104 V78 a14,14 0 0 1 14,-14 H526 a14,14 0 0 1 14,14 V104 Z" fill="#5C6470"/>
+  <path d="M60,79 L65,84 L60,89 L55,84 Z" fill="#FFFFFF"/>
+  <text x="76" y="89" font-size="14.5" fill="#FFFFFF" font-weight="bold">Batch VNet</text>
+  <rect x="560" y="64" width="500" height="260" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M560,104 V78 a14,14 0 0 1 14,-14 H1046 a14,14 0 0 1 14,14 V104 Z" fill="#5C6470"/>
+  <path d="M580,79 L585,84 L580,89 L575,84 Z" fill="#FFFFFF"/>
+  <text x="596" y="89" font-size="14.5" fill="#FFFFFF" font-weight="bold">Consumer VNet</text>
+  <rect x="80" y="118" width="420" height="64" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="290.0" y="147.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Batch VM / AKS node / ADF IR</text>
+  <text x="290.0" y="167.5" font-size="10" fill="#5C6470" text-anchor="middle">workload in the batch VNet</text>
+  <path d="M290,185 V229" fill="none" stroke="#C42B12" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <text x="302" y="212" font-size="10" fill="#16233A">DNS: &lt;dbid&gt;.databases.neo4j.io</text>
+  <rect x="80" y="232" width="420" height="76" rx="10" fill="#FDF2EF" stroke="#C42B12" stroke-width="1.5"/>
+  <text x="290.0" y="267.5" font-size="13" fill="#C42B12" text-anchor="middle" font-weight="bold">Public DNS answers 52.x.x.x</text>
+  <text x="290.0" y="287.5" font-size="10" fill="#A8776C" text-anchor="middle">Aura refuses the connection</text>
+  <rect x="600" y="118" width="420" height="64" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="810.0" y="147.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Your app VMs</text>
+  <text x="810.0" y="167.5" font-size="10" fill="#5C6470" text-anchor="middle">workload in the consumer VNet</text>
+  <path d="M810,185 V229" fill="none" stroke="#2E8B57" stroke-width="1.8" marker-end="url(#arrow-green)"/>
+  <text x="822" y="212" font-size="10" fill="#16233A">DNS: &lt;dbid&gt;.databases.neo4j.io</text>
+  <rect x="600" y="232" width="420" height="76" rx="10" fill="#EDF7F1" stroke="#2E8B57" stroke-width="1.5"/>
+  <text x="810.0" y="267.5" font-size="13" fill="#1E6B41" text-anchor="middle" font-weight="bold">Private DNS zone answers 10.x.x.x</text>
+  <text x="810.0" y="287.5" font-size="10" fill="#5C8B6F" text-anchor="middle">the zone is linked to this VNet</text>
+  <rect x="40" y="344" width="1020" height="38" rx="10" fill="#EEF1F5" stroke="#C3CAD3" stroke-width="1"/>
+  <text x="550.0" y="369" font-size="13" fill="#2E3540" text-anchor="middle" font-family="Menlo, monospace">The Private DNS zone is linked to the consumer VNet only</text>
+</svg>

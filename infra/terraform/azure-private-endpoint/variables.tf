@@ -36,12 +36,12 @@ variable "private_endpoint_name" {
 }
 
 variable "aura_pls_alias" {
-  description = "Neo4j Aura Private Link Service alias from the Aura console. Example: production-orch-0477-service.<guid>.<region>.azure.privatelinkservice"
+  description = "Neo4j Aura Private Link Service alias from the Aura console. Example: production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice"
   type        = string
 }
 
 variable "aura_instance_id" {
-  description = "Aura instance id (the host label of the hostname, e.g. `b7253d3b` from `b7253d3b.databases.neo4j.io`). Used to create the A record in the private DNS zone."
+  description = "Aura instance id (the host label of the hostname, e.g. `abcd1234` from `abcd1234.databases.neo4j.io`). Used to create the A record in the private DNS zone."
   type        = string
 }
 
@@ -52,7 +52,7 @@ variable "manage_private_dns" {
 }
 
 variable "connection_request_message" {
-  description = "Free-form message attached to the PLS connection request. Shows up on the Aura approval screen — make it identifying so the Aura admin can match the request."
+  description = "Free-form message attached to the PLS connection request. Shows up on the Aura approval screen. Make it identifying so the Aura admin can match the request."
   type        = string
   default     = "Databricks-adjacent workloads connecting to Neo4j Aura via Azure PrivateLink."
 }

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="430" viewBox="0 0 1100 430" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" role="img">
+  <title>Control plane versus serverless compute plane</title>
+  <defs><marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/></marker><marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5C6470"/></marker><marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C42B12"/></marker><marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E6DB4"/></marker><marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E8B57"/></marker><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/></filter></defs>
+  <rect x="10" y="10" width="1080" height="410" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <rect x="1000" y="34" width="10" height="10" rx="2" fill="#2E6DB4"/><text x="1018" y="43" font-size="12" fill="#16233A">Neo4j</text><rect x="893" y="34" width="10" height="10" rx="2" fill="#E1503A"/><text x="911" y="43" font-size="12" fill="#16233A">Databricks</text>
+  <rect x="40" y="64" width="1020" height="130" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M40,104 V78 a14,14 0 0 1 14,-14 H1046 a14,14 0 0 1 14,14 V104 Z" fill="#5C6470"/>
+  <path d="M60,79 L65,84 L60,89 L55,84 Z" fill="#FFFFFF"/>
+  <text x="76" y="89" font-size="14.5" fill="#FFFFFF" font-weight="bold">Control plane</text>
+  <rect x="70" y="118" width="300" height="62" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="220.0" y="146.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Databricks control plane</text>
+  <text x="220.0" y="166.5" font-size="10" fill="#5C6470" text-anchor="middle">orchestration, UI, metadata</text>
+  <text x="400" y="146" font-size="13" fill="#16233A" font-weight="bold">Managed by Databricks.</text>
+  <text x="400" y="164" font-size="11" fill="#5C6470">Not configured in this guide.</text>
+  <rect x="40" y="220" width="1020" height="170" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M40,260 V234 a14,14 0 0 1 14,-14 H1046 a14,14 0 0 1 14,14 V260 Z" fill="#E1503A"/>
+  <path d="M60,235 L65,240 L60,245 L55,240 Z" fill="#FFFFFF"/>
+  <text x="76" y="245" font-size="14.5" fill="#FFFFFF" font-weight="bold">Serverless compute plane</text>
+  <rect x="70" y="270" width="250" height="90" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="195.0" y="312.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Notebook / Job / SQL</text>
+  <text x="195.0" y="332.5" font-size="10" fill="#5C6470" text-anchor="middle">customer queries</text>
+  <path d="M323,315 H417" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <text x="370" y="307" font-size="10" fill="#16233A" text-anchor="middle">Bolt+TLS</text>
+  <rect x="420" y="270" width="250" height="90" rx="10" fill="#FDF2EF" stroke="#E1503A" stroke-width="1.5"/>
+  <text x="545.0" y="312.5" font-size="13" fill="#C42B12" text-anchor="middle" font-weight="bold">NCC private endpoint</text>
+  <text x="545.0" y="332.5" font-size="10" fill="#A8776C" text-anchor="middle">configured in this guide</text>
+  <path d="M673,315 H767" fill="none" stroke="#5C6470" stroke-width="2" marker-end="url(#arrow-dark)"/>
+  <text x="720" y="307" font-size="10" fill="#16233A" text-anchor="middle">Azure backbone</text>
+  <rect x="770" y="270" width="250" height="90" rx="10" fill="#EAF1FA" stroke="#2E6DB4" stroke-width="1.6"/>
+  <text x="895.0" y="312.5" font-size="13" fill="#1F4F8A" text-anchor="middle" font-weight="bold">Aura PLS</text>
+  <text x="895.0" y="332.5" font-size="10" fill="#5E7FA8" text-anchor="middle">Neo4j-managed subscription</text>
+</svg>

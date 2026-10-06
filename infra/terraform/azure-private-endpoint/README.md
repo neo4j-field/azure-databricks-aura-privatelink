@@ -1,8 +1,8 @@
-# Terraform: Azure-Native Private Endpoint to Neo4j Aura PLS
+# Terraform: Private Endpoint Stack (Azure Private Endpoint to Neo4j Aura PLS)
 
-Provisions a customer-managed Private Endpoint into Aura's Private Link Service, plus the private DNS zone wiring required for the Aura hostname to resolve to the PE NIC.
+Provisions a Private Endpoint in your VNet into Aura's Private Link Service, plus the private DNS zone wiring required for the Aura hostname to resolve to the PE NIC.
 
-Use this stack when your consumer is **not** Databricks Serverless. Typical fits:
+Use this stack (the **Private Endpoint stack**) when your consumer is **not** Databricks Serverless. Typical fits:
 
 - Classic Azure Databricks clusters (VNet-injected workspaces)
 - Azure Data Factory self-hosted IR
@@ -10,7 +10,7 @@ Use this stack when your consumer is **not** Databricks Serverless. Typical fits
 - Jump VMs / Bastion-fronted admin hosts
 - Azure Functions on VNet integration
 
-For **Azure Databricks Serverless**, use [`../databricks-ncc/`](../databricks-ncc/) instead. Serverless compute runs in Databricks-managed subscriptions and cannot consume a customer-VNet private endpoint.
+For **Azure Databricks Serverless**, use the **NCC stack** [`../databricks-ncc/`](../databricks-ncc/) instead. Serverless compute runs in Databricks-managed subscriptions and cannot consume a customer-VNet private endpoint.
 
 ## What this stack creates
 
@@ -96,21 +96,7 @@ Self-contained and correct for a single VNet with no centralized DNS. Nothing el
 
 Larger Azure estates centralize DNS: one **hub** VNet owns the private DNS zones (often fronted by Azure DNS Private Resolver), and **spoke** VNets consume them over peering and zone links. In that model the hub owns `databases.neo4j.io`, and a spoke must never create its own copy of that zone:
 
-```
-                 HUB VNet
-        ┌───────────────────────────┐
-        │  Azure Private DNS zones   │   <- ONE place owns databases.neo4j.io
-        │  (+ optional DNS Resolver) │
-        └───────────┬───────────────┘
-                    │ VNet peering + zone links
-        ┌───────────┼───────────────┐
-        ▼           ▼               ▼
-   SPOKE VNet   SPOKE VNet     SPOKE VNet
-   (Databricks) (ADF)          (AKS)
-        │
-        ▼
-   Private Endpoint -> Aura PLS   (private IP lives here)
-```
+![A hub VNet owns the private DNS zones and spoke VNets consume them through peering and zone links](../../../docs/images/hub-and-spoke-dns.svg)
 
 If this stack tried to create a `databases.neo4j.io` zone in a spoke, one of two things breaks:
 

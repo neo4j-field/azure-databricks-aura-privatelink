@@ -4,7 +4,7 @@ When public access is disabled on Aura, any workload running in a VNet that is n
 linked to the Private DNS Zone for `databases.neo4j.io` will resolve the Aura
 hostname via public DNS, receive the public IP, and be refused.
 
-This guide covers restoring connectivity for Azure workloads in other VNets —
+This guide covers restoring connectivity for Azure workloads in other VNets,
 including classic Databricks clusters, Azure Data Factory, Azure Kubernetes Service,
 Azure Machine Learning compute clusters, Azure Functions, and any VM-based batch
 process.
@@ -13,14 +13,7 @@ process.
 
 ## Why it breaks
 
-```
-Batch VNet                                Consumer VNet
-──────────────────────────────────────    ──────────────────────────────────────
-  Batch VM / AKS node / ADF IR              Your app VMs
-    │                                          │
-    │ DNS: <dbid>.databases.neo4j.io          │ DNS: <dbid>.databases.neo4j.io
-    │ → public: 52.x.x.x ✗ refused            │ → Private DNS Zone → 10.x.x.x ✓
-```
+![A batch VNet resolves the Aura hostname to a public IP while the consumer VNet resolves it to a private IP](images/batch-vnet-dns-gap.svg)
 
 The Private DNS Zone `databases.neo4j.io` is linked to the consumer VNet only.
 Workloads in any other VNet resolve via public DNS until you explicitly link the
@@ -32,16 +25,16 @@ zone to their VNet.
 
 | Scenario | Fix |
 |----------|-----|
-| Batch VNet is in the **same subscription** as the consumer VNet | [Option A](#option-a-add-a-vnet-link-to-the-private-dns-zone) — add a VNet link and VNet peering |
-| Batch VNet is in a **different subscription** | [Option B](#option-b-create-a-new-private-endpoint-in-the-batch-vnet) — add subscription to Aura, deploy a new Private Endpoint |
-| **Databricks Serverless** | Use the [`databricks-ncc/` Terraform stack](../infra/terraform/databricks-ncc/) — NCC manages DNS independently |
-| **Databricks classic (VNet-injected)** | Option A — link the DNS zone to the Databricks VNet + peer VNets |
+| Batch VNet is in the **same subscription** as the consumer VNet | [Option A](#option-a-add-a-vnet-link-to-the-private-dns-zone). Add a VNet link and VNet peering |
+| Batch VNet is in a **different subscription** | [Option B](#option-b-create-a-new-private-endpoint-in-the-batch-vnet). Add subscription to Aura, deploy a new Private Endpoint |
+| **Databricks Serverless** | Use the [`databricks-ncc/` Terraform stack](../infra/terraform/databricks-ncc/). NCC manages DNS independently |
+| **Databricks classic (VNet-injected)** | Option A. Link the DNS zone to the Databricks VNet + peer VNets |
 
 ---
 
 ## Option A: Add a VNet link to the Private DNS Zone
 
-A single Private Endpoint NIC is reachable from any peered VNet — Azure exports
+A single Private Endpoint NIC is reachable from any peered VNet. Azure exports
 the endpoint NIC's subnet route across VNet peerings. The only missing piece is
 usually DNS: the Private DNS Zone must be explicitly linked to each VNet whose
 workloads need to resolve the Aura hostname.
@@ -139,14 +132,14 @@ to use the Private URI from the Aura console:
 
 ```
 # Before (public, now refused)
-NEO4J_URI=neo4j+s://b7253d3b.databases.neo4j.io
+NEO4J_URI=neo4j+s://<aura-id>.databases.neo4j.io
 
-# After (private — same hostname, routed via Private Endpoint)
-NEO4J_URI=neo4j+s://b7253d3b.databases.neo4j.io
+# After (private: same hostname, routed via Private Endpoint)
+NEO4J_URI=neo4j+s://<aura-id>.databases.neo4j.io
 ```
 
 > On Azure, the Private URI and the public URI share the same hostname
-> (`<dbid>.databases.neo4j.io`). Only the DNS resolution changes — the private
+> (`<dbid>.databases.neo4j.io`). Only the DNS resolution changes. The private
 > zone resolves it to the PE NIC IP. No hostname change in your connection string
 > is required, unlike other cloud providers.
 
@@ -155,7 +148,7 @@ NEO4J_URI=neo4j+s://b7253d3b.databases.neo4j.io
 ## Option B: Create a new Private Endpoint in the batch VNet
 
 When the batch VNet is in a different Azure subscription, VNet linking alone is
-insufficient — you must create a new Private Endpoint in that subscription. A
+insufficient. You must create a new Private Endpoint in that subscription. A
 Private Link Service allows multiple consumers from different subscriptions.
 
 ### Step 1: Register the batch subscription in Aura
@@ -220,7 +213,7 @@ import socket
 print(socket.gethostbyname("<dbid>.databases.neo4j.io"))  # expect 10.x.x.x
 ```
 
-### Azure Data Factory — Self-hosted Integration Runtime
+### Azure Data Factory: Self-hosted Integration Runtime
 
 The self-hosted IR is a VM (or VM Scale Set) in your VNet. Apply Option A for the
 IR's VNet. Update the ADF linked service connection string to the Private URI.
@@ -282,7 +275,7 @@ environment variables.
 ## Multiple Aura instances in the same VNet
 
 Each Aura instance has its own `<dbid>` A record. The Private DNS Zone
-`databases.neo4j.io` is a **shared zone** — you add one record per instance, not
+`databases.neo4j.io` is a **shared zone**. You add one record per instance, not
 one zone per instance. When onboarding a second Aura instance, run the
 `azure-private-endpoint` Terraform stack for the new instance with `manage_private_dns = false`
 and add the A record manually, or set `aura_instance_id` to the new instance ID

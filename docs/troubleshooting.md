@@ -89,18 +89,18 @@ driver = GraphDatabase.driver(
 2. **Test TCP reach**:
    ```python
    import socket
-   s = socket.create_connection(("d48d6199.databases.neo4j.io", 7687), timeout=10)
+   s = socket.create_connection(("<aura-id>.databases.neo4j.io", 7687), timeout=10)
    s.close()
    ```
 3. **Verify Bolt port**: Aura uses `7687` for Bolt+TLS. Confirm the URI scheme is `neo4j+s://` not `neo4j://`.
-4. **Check Aura instance state** in the console — must be `Running`.
+4. **Check Aura instance state** in the console. It must be `Running`.
 5. **Public access disabled too soon?** If you disabled public access before confirming private path works, temporarily re-enable to isolate which layer is broken.
 
 ## TLS handshake fails
 
 **Symptom:** `SSL: CERTIFICATE_VERIFY_FAILED` or similar.
 
-**Cause:** SNI/hostname mismatch — usually because the client connected to a different hostname than the certificate covers.
+**Cause:** This is an SNI/hostname mismatch, usually because the client connected to a different hostname than the certificate covers.
 
 **Fix:** Confirm you are using the **Private URI** from the Aura console, not a custom hostname or IP. The TLS cert is issued for the Aura hostname.
 

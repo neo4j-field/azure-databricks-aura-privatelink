@@ -10,7 +10,7 @@ security team one question:
 > **"How do developers in other teams access private resources in Azure today?"**
 
 Most organizations that run workloads in Azure already have an approved, audited
-method for private access — a corporate VPN, a jump host pattern, an Azure Bastion
+method for private access: a corporate VPN, a jump host pattern, an Azure Bastion
 policy, or a Point-to-Site VPN that developers use to reach internal databases,
 Key Vault, or private APIs. If that method exists, use it. Connect Neo4j Desktop
 or your browser the same way those teams connect to their private Azure resources.
@@ -21,11 +21,11 @@ Common patterns already in use at organizations that run Azure:
 
 | If your teams currently use… | Do the same for Neo4j |
 |------------------------------|-----------------------|
-| A corporate VPN (Cisco AnyConnect, Palo Alto GlobalProtect, Zscaler, etc.) that gives access to Azure private resources | Connect via the same VPN — once on it, Neo4j Desktop connects to the private URI directly |
-| Azure Point-to-Site VPN (OpenVPN or IKEv2) | Use the same VPN connection — link the existing Private DNS Zone to your VNet if not already done |
+| A corporate VPN (Cisco AnyConnect, Palo Alto GlobalProtect, Zscaler, etc.) that gives access to Azure private resources | Connect via the same VPN. Once on it, Neo4j Desktop connects to the private URI directly |
+| Azure Point-to-Site VPN (OpenVPN or IKEv2) | Use the same VPN connection. Link the existing Private DNS Zone to your VNet if not already done |
 | Azure Bastion to access jump box VMs | Use the same Bastion setup with SSH port-forwarding (same pattern as Option A below) |
 | ExpressRoute or Site-to-Site VPN from your office or data centre | The Neo4j Private Endpoint is reachable from any machine whose traffic routes through the connected VNet |
-| Nothing yet — this is the first private Azure workload | Use Option B (Azure P2S VPN with OpenVPN) — it is Azure-native, integrates with Azure AD + MFA, and is widely accepted in regulated industries |
+| Nothing yet: this is the first private Azure workload | Use Option B (Azure P2S VPN with OpenVPN). It is Azure-native, integrates with Azure AD + MFA, and is widely accepted in regulated industries |
 
 Only continue to the options below if your organization does not already have a
 standard method, or if your security team has asked you to evaluate one of the
@@ -35,50 +35,23 @@ documented patterns.
 
 ## How it works
 
-```
-Your laptop (public DNS: <dbid>.databases.neo4j.io → 52.x.x.x ✗ refused)
-                         │
-               Option A  │  Option B
-          Azure Bastion  │  P2S VPN Gateway
-          (SSH tunnel)   │  (OpenVPN)
-                         │
-         Jump box VM ←──┘└──► Your laptop joined to VNet
-              │                         │
-              └──── Private DNS Zone ───┘
-                    resolves to PE NIC:
-                    <dbid>.databases.neo4j.io → 10.x.x.x
-                              │
-                    Azure Private Endpoint NIC
-                              │
-                    Neo4j Aura VDC (over Azure backbone)
-```
+![A laptop reaches Aura through Azure Bastion or a point-to-site VPN, then the private DNS zone and private endpoint](images/desktop-access-overview.svg)
 
 ---
 
-## Option A — Azure Bastion + SSH Tunnel
+## Option A: Azure Bastion + SSH Tunnel
 
 Azure Bastion is Microsoft's managed SSH/RDP proxy. The jump box VM that Bastion
 connects to has no public IP. The Bastion host itself has a public IP but that is
-an Azure-managed resource — your developers never SSH directly to a VM IP.
+an Azure-managed resource. Your developers never SSH directly to a VM IP.
 
 **Standard tier is required.** Basic Bastion only exposes a browser-based terminal.
 Standard tier adds `az network bastion tunnel`, which opens a local TCP port that
-lets a desktop SSH client connect — necessary for port-forwarding Neo4j traffic.
+lets a desktop SSH client connect. This is necessary for port-forwarding Neo4j traffic.
 
 ### What you will build
 
-```
-Developer laptop
-  │  az network bastion tunnel (HTTPS/443 to Azure Bastion)
-  ▼
-Azure Bastion (Standard, public IP, AzureBastionSubnet)
-  │  SSH
-  ▼
-Jump box VM (no public IP, consumer VNet)
-  │  socat proxy → PE NIC IP
-  ▼
-Private Endpoint NIC → Neo4j Aura VDC
-```
+![Developer laptop to Azure Bastion, jump box VM, private endpoint NIC, and Aura](images/desktop-bastion-path.svg)
 
 ### Step 1: Deploy the jump box and Bastion
 
@@ -95,7 +68,7 @@ module "jumpbox" {
   vnet_name            = var.virtual_network_name
   vnet_resource_group  = var.resource_group_name
   jump_subnet_name     = "jump-subnet"           # must already exist, /28 or larger
-  bastion_subnet_cidr  = "10.0.255.0/26"         # AzureBastionSubnet — /26 is minimum
+  bastion_subnet_cidr  = "10.0.255.0/26"         # AzureBastionSubnet: /26 is minimum
   pe_nic_ip            = module.private_endpoint.private_endpoint_nic_ip
   neo4j_ports          = [7687, 7474, 7473, 8491]
   tags                 = var.tags
@@ -117,7 +90,7 @@ cd infra/terraform/azure-private-endpoint
 terraform apply   # already ran? re-run picks up new module
 ```
 
-Note the jump box resource ID from the module output — you need it in the next step:
+Note the jump box resource ID from the module output. You need it in the next step:
 
 ```
 jumpbox_resource_id = "/subscriptions/.../virtualMachines/neo4j-jumpbox"
@@ -135,7 +108,7 @@ Open your hosts file as administrator:
 - **macOS / Linux**: `/etc/hosts`
 - **Windows**: `C:\Windows\System32\drivers\etc\hosts`
 
-Add one line — use your Aura instance hostname:
+Add one line: use your Aura instance hostname:
 
 ```
 127.0.0.1  <dbid>.databases.neo4j.io
@@ -144,7 +117,7 @@ Add one line — use your Aura instance hostname:
 Example:
 
 ```
-127.0.0.1  b7253d3b.databases.neo4j.io
+127.0.0.1  <aura-id>.databases.neo4j.io
 ```
 
 > Remove this line when you no longer need the tunnel. While it is present, every
@@ -216,38 +189,27 @@ Kill both terminal processes when done. Remove the `/etc/hosts` line once closed
 
 ---
 
-## Option B — Azure Point-to-Site VPN Gateway (OpenVPN)
+## Option B: Azure Point-to-Site VPN Gateway (OpenVPN)
 
 **This is the recommended option for financial services, insurance, and regulated
 industries.** Azure P2S VPN is a Microsoft-managed service that:
 
-- Uses the **OpenVPN protocol** — battle-tested, widely accepted by compliance and
+- Uses the **OpenVPN protocol**, battle-tested, widely accepted by compliance and
   security teams in regulated sectors
 - Integrates with **Azure Active Directory** for authentication, enabling
   **MFA via Conditional Access** policies
 - Produces full audit trails in **Azure Monitor** and Log Analytics
 - Holds compliance certifications for **ISO 27001, SOC 1/2, PCI DSS, FedRAMP**
-- Requires **no VM to manage** — Microsoft operates the gateway infrastructure
+- Requires **no VM to manage**. Microsoft operates the gateway infrastructure
 
 When connected, your laptop joins the VNet as a full participant. The Private DNS
 Zone linked to that VNet resolves `<dbid>.databases.neo4j.io` to the Private
 Endpoint NIC IP automatically. Neo4j Desktop, browsers, and any driver connect
-with the Private URI as-is — no hosts file changes, no tunnel window to keep open.
+with the Private URI as-is, with no hosts file changes and no tunnel window to keep open.
 
 ### Architecture
 
-```
-Developer laptop (VPN client connected)
-  │
-  │  OpenVPN tunnel (TCP/443 or UDP/1194)
-  ▼
-Azure VPN Gateway (P2S, GatewaySubnet)
-  │  Joined to VNet
-  ▼
-Private DNS Zone: <dbid>.databases.neo4j.io → PE NIC IP
-  │
-Private Endpoint NIC → Neo4j Aura VDC
-```
+![Developer laptop to the VPN gateway, private DNS zone, private endpoint NIC, and Aura](images/desktop-vpn-path.svg)
 
 ### Prerequisites
 
@@ -315,11 +277,11 @@ resource "azurerm_virtual_network_gateway" "p2s" {
 **Connect developers:**
 
 1. In the Azure portal, navigate to your VPN Gateway → **Point-to-site configuration**
-2. Click **Download VPN client** — this produces a zip with OpenVPN config profiles
+2. Click **Download VPN client**. This produces a zip with OpenVPN config profiles
 3. Developers install the **Azure VPN Client** (Windows/macOS) and import the profile
 4. They authenticate with their Entra ID credentials + MFA
 5. Once connected, `<dbid>.databases.neo4j.io` resolves to the PE NIC IP
-6. Open Neo4j Desktop: `bolt+s://<dbid>.databases.neo4j.io:7687` — works directly
+6. Open Neo4j Desktop: `bolt+s://<dbid>.databases.neo4j.io:7687`. This works directly
 
 ### Option B-2: Certificate-based authentication
 
@@ -347,12 +309,12 @@ AD auth is strongly preferred.
 
 ## Option comparison
 
-| | Option A — Azure Bastion | Option B — P2S VPN (OpenVPN) |
+| | Option A: Azure Bastion | Option B: P2S VPN (OpenVPN) |
 |---|---|---|
 | Public IP required | On Bastion host (Azure-managed) | On VPN Gateway (Azure-managed) |
 | VMs to manage | Jump box VM | None |
-| DNS managed automatically | No — hosts file required | Yes — Private DNS Zone resolves natively |
-| Tunnel command to keep open | Yes (two terminals) | No — VPN client handles reconnects |
+| DNS managed automatically | No, hosts file required | Yes, Private DNS Zone resolves natively |
+| Tunnel command to keep open | Yes (two terminals) | No, VPN client handles reconnects |
 | Authentication | SSH key | Azure AD + MFA (recommended) or certificates |
 | Audit trail | SSH logs on jump box | Azure Monitor / Log Analytics |
 | FIPS 140-2 | Not applicable | ✅ Azure-managed |

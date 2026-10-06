@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="420" viewBox="0 0 1100 420" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" role="img">
+  <title>Who answers DNS for the Aura hostname in each stack</title>
+  <defs><marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/></marker><marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5C6470"/></marker><marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C42B12"/></marker><marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E6DB4"/></marker><marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E8B57"/></marker><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/></filter></defs>
+  <rect x="10" y="10" width="1080" height="400" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <rect x="928" y="34" width="10" height="10" rx="2" fill="#8A8A8A"/><text x="946" y="43" font-size="12" fill="#16233A">Azure / customer</text><rect x="822" y="34" width="10" height="10" rx="2" fill="#E1503A"/><text x="840" y="43" font-size="12" fill="#16233A">Databricks</text>
+  <text x="40" y="70" font-size="14" fill="#16233A" font-weight="bold">Who answers for &lt;aura-id&gt;.databases.neo4j.io ?</text>
+  <text x="40" y="106" font-size="10" fill="#5C6470" font-weight="bold" letter-spacing="0.6">STACK</text>
+  <text x="340" y="106" font-size="10" fill="#5C6470" font-weight="bold" letter-spacing="0.6">WHO ANSWERS</text>
+  <text x="680" y="106" font-size="10" fill="#5C6470" font-weight="bold" letter-spacing="0.6">WHAT YOU MANAGE</text>
+  <rect x="40" y="120" width="260" height="76" rx="10" fill="#FDF2EF" stroke="#E1503A" stroke-width="1.5"/>
+  <text x="170.0" y="155.5" font-size="13" fill="#C42B12" text-anchor="middle" font-weight="bold">NCC stack</text>
+  <text x="170.0" y="175.5" font-size="10" fill="#A8776C" text-anchor="middle">Databricks Serverless</text>
+  <path d="M303,158 H337" fill="none" stroke="#C42B12" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <rect x="340" y="120" width="300" height="76" rx="10" fill="#FDF2EF" stroke="#E1503A" stroke-width="1.5"/>
+  <text x="490.0" y="155.5" font-size="13" fill="#C42B12" text-anchor="middle" font-weight="bold">NCC managed DNS</text>
+  <text x="490.0" y="175.5" font-size="10" fill="#A8776C" text-anchor="middle">populated by domain_names</text>
+  <path d="M643,158 H677" fill="none" stroke="#C42B12" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <rect x="680" y="120" width="380" height="76" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="870.0" y="155.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">You manage nothing</text>
+  <text x="870.0" y="175.5" font-size="10" fill="#5C6470" text-anchor="middle">there is no zone to create</text>
+  <rect x="40" y="216" width="260" height="76" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="170.0" y="251.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Private Endpoint stack</text>
+  <text x="170.0" y="271.5" font-size="10" fill="#5C6470" text-anchor="middle">single VNet</text>
+  <path d="M303,254 H337" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <rect x="340" y="216" width="300" height="76" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="490.0" y="251.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Private DNS zone</text>
+  <text x="490.0" y="271.5" font-size="10" fill="#5C6470" text-anchor="middle">in your resource group</text>
+  <path d="M643,254 H677" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <rect x="680" y="216" width="380" height="76" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="870.0" y="251.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">The stack creates it</text>
+  <text x="870.0" y="271.5" font-size="10" fill="#5C6470" text-anchor="middle">manage_private_dns = true</text>
+  <rect x="40" y="312" width="260" height="76" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="170.0" y="347.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Private Endpoint stack</text>
+  <text x="170.0" y="367.5" font-size="10" fill="#5C6470" text-anchor="middle">hub-and-spoke</text>
+  <path d="M303,350 H337" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <rect x="340" y="312" width="300" height="76" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="490.0" y="347.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Private DNS zone</text>
+  <text x="490.0" y="367.5" font-size="10" fill="#5C6470" text-anchor="middle">in the shared hub VNet</text>
+  <path d="M643,350 H677" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <rect x="680" y="312" width="380" height="76" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="870.0" y="340.0" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">The platform team owns it</text>
+  <text x="870.0" y="360.0" font-size="10" fill="#5C6470" text-anchor="middle">you add the A record and the link</text>
+  <text x="870.0" y="375.0" font-size="10" fill="#5C6470" text-anchor="middle">manage_private_dns = false</text>
+</svg>

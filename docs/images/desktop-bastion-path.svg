@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="630" viewBox="0 0 620 630" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" role="img">
+  <title>Developer laptop to Aura through Azure Bastion</title>
+  <defs><marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/></marker><marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5C6470"/></marker><marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C42B12"/></marker><marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E6DB4"/></marker><marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E8B57"/></marker><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/></filter></defs>
+  <rect x="10" y="10" width="600" height="610" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <rect x="520" y="34" width="10" height="10" rx="2" fill="#2E6DB4"/><text x="538" y="43" font-size="12" fill="#16233A">Neo4j</text><rect x="374" y="34" width="10" height="10" rx="2" fill="#8A8A8A"/><text x="392" y="43" font-size="12" fill="#16233A">Azure / customer</text>
+  <rect x="60" y="80" width="380" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="250.0" y="112.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Developer laptop</text>
+  <text x="250.0" y="132.5" font-size="10" fill="#5C6470" text-anchor="middle">Neo4j Desktop or a local driver</text>
+  <path d="M250.0,153 V189" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <text x="264.0" y="174.0" font-size="10" fill="#16233A">az network bastion tunnel (HTTPS 443)</text>
+  <rect x="60" y="190" width="380" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="250.0" y="215.0" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Azure Bastion</text>
+  <text x="250.0" y="235.0" font-size="10" fill="#5C6470" text-anchor="middle">Standard tier, public IP</text>
+  <text x="250.0" y="250.0" font-size="10" fill="#5C6470" text-anchor="middle">AzureBastionSubnet</text>
+  <path d="M250.0,263 V299" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <text x="264.0" y="284.0" font-size="10" fill="#16233A">SSH</text>
+  <rect x="60" y="300" width="380" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="250.0" y="332.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Jump box VM</text>
+  <text x="250.0" y="352.5" font-size="10" fill="#5C6470" text-anchor="middle">no public IP, in the consumer VNet</text>
+  <path d="M250.0,373 V409" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <text x="264.0" y="394.0" font-size="10" fill="#16233A">socat proxy to the PE NIC IP</text>
+  <rect x="60" y="410" width="380" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="250.0" y="442.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Private Endpoint NIC</text>
+  <text x="250.0" y="462.5" font-size="10" fill="#5C6470" text-anchor="middle">the private IP of the endpoint</text>
+  <path d="M250.0,483 V519" fill="none" stroke="#2E6DB4" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+  <text x="264.0" y="504.0" font-size="10" fill="#16233A">Azure backbone</text>
+  <rect x="60" y="520" width="380" height="70" rx="10" fill="#EAF1FA" stroke="#2E6DB4" stroke-width="1.6"/>
+  <text x="250.0" y="552.5" font-size="13" fill="#1F4F8A" text-anchor="middle" font-weight="bold">Neo4j Aura VDC</text>
+  <text x="250.0" y="572.5" font-size="10" fill="#5E7FA8" text-anchor="middle">Neo4j-managed subscription</text>
+</svg>

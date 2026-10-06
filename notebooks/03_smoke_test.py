@@ -1,10 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # PrivateLink Smoke Test: dbxuk-svrless-drose <-> Aura b7253d3b
+# MAGIC # PrivateLink Smoke Test: Databricks Serverless <-> Neo4j Aura
 # MAGIC
-# MAGIC End-to-end validation that data flows privately between the
-# MAGIC `dbxuk-svrless-drose` workspace (Azure Databricks Serverless, UK South)
-# MAGIC and the Aura instance `b7253d3b.databases.neo4j.io` over Azure PrivateLink.
+# MAGIC End-to-end validation that data flows privately between this
+# MAGIC Azure Databricks Serverless workspace and the Aura instance named in the
+# MAGIC `neo4j` secret scope over Azure PrivateLink.
 # MAGIC
 # MAGIC **What this notebook does**
 # MAGIC 1. Loads Neo4j credentials from the `neo4j` secret scope
@@ -20,7 +20,7 @@
 # MAGIC - Approve the incoming PE request in the Aura console
 # MAGIC - Wait until the rule reads `ESTABLISHED` in the Databricks NCC view
 # MAGIC - Restart any running serverless compute, then attach this notebook to
-# MAGIC   a serverless cluster in the `dbxuk-svrless-drose` workspace
+# MAGIC   serverless compute in the workspace the NCC is attached to
 # MAGIC - Databricks secret scope `neo4j` populated with: `uri`, `username`, `password`
 
 # COMMAND ----------
@@ -30,7 +30,7 @@
 
 # COMMAND ----------
 
-# MAGIC %md ## 1. Load credentials and pin expected targets
+# MAGIC %md ## 1. Load credentials and derive the target host
 
 # COMMAND ----------
 
@@ -44,18 +44,13 @@ NEO4J_USER     = dbutils.secrets.get(scope="neo4j", key="username")
 NEO4J_PASSWORD = dbutils.secrets.get(scope="neo4j", key="password")
 NEO4J_DATABASE = "neo4j"
 
-EXPECTED_HOST   = "b7253d3b.databases.neo4j.io"
+EXPECTED_HOST   = urlparse(NEO4J_URI).hostname
 TEST_LABEL      = "DbxSmokeCustomer"
-TEST_BATCH_TAG  = f"dbxuk-svrless-drose-{int(time.time())}"
+TEST_BATCH_TAG  = f"smoke-test-{int(time.time())}"
 SAMPLE_ROWS     = 100
 BATCH_SIZE      = 25
 
-resolved_host = urlparse(NEO4J_URI).hostname
-assert resolved_host == EXPECTED_HOST, (
-    f"Secret scope URI host ({resolved_host}) does not match the expected Aura instance "
-    f"({EXPECTED_HOST}). Refusing to run the smoke test against the wrong target."
-)
-print(f"URI host : {resolved_host}")
+print(f"URI host : {EXPECTED_HOST}")
 print(f"User     : {NEO4J_USER}")
 print(f"Run tag  : {TEST_BATCH_TAG}")
 
@@ -101,7 +96,10 @@ from tenacity import (
     wait_exponential,
 )
 
-ROUTING_HOST_PATTERN = re.compile(r"^p-b7253d3b-[^.]+\.production-orch-0477\.neo4j\.io$")
+# Aura VDC advertises routing hosts shaped like p-<dbid>-<suffix>.<orch>.neo4j.io;
+# the dbid is the first label of the connection host.
+dbid = EXPECTED_HOST.split(".")[0]
+ROUTING_HOST_PATTERN = re.compile(rf"^p-{re.escape(dbid)}-.*\.neo4j\.io$")
 
 def aura_private_resolver(address):
     # Aura VDC can return p-*.neo4j.io addresses in the routing table. If those
@@ -249,4 +247,4 @@ print("Cleanup complete.")
 # COMMAND ----------
 
 driver.close()
-print("Smoke test PASSED — dbxuk-svrless-drose <-> Aura b7253d3b over PrivateLink is healthy.")
+print(f"Smoke test PASSED: Databricks Serverless <-> Aura {EXPECTED_HOST} over PrivateLink is healthy.")

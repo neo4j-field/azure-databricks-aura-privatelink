@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="550" viewBox="0 0 1100 550" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" role="img">
+  <title>DNS resolution and TLS path from a notebook to Aura</title>
+  <defs><marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/></marker><marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5C6470"/></marker><marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C42B12"/></marker><marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E6DB4"/></marker><marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E8B57"/></marker><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/></filter></defs>
+  <rect x="10" y="10" width="1080" height="530" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <rect x="1000" y="34" width="10" height="10" rx="2" fill="#2E6DB4"/><text x="1018" y="43" font-size="12" fill="#16233A">Neo4j</text><rect x="893" y="34" width="10" height="10" rx="2" fill="#E1503A"/><text x="911" y="43" font-size="12" fill="#16233A">Databricks</text>
+  <rect x="48" y="94" width="444" height="310" rx="14" fill="none" stroke="#8A8A8A" stroke-width="1.2" stroke-dasharray="6,4"/>
+  <text x="62" y="88" font-size="10" fill="#5C6470" font-weight="bold" letter-spacing="0.6">DATABRICKS SERVERLESS COMPUTE PLANE</text>
+  <rect x="60" y="104" width="420" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="270.0" y="136.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Notebook</text>
+  <text x="270.0" y="156.5" font-size="10" fill="#5C6470" text-anchor="middle">socket.gethostbyname("&lt;aura-id&gt;.databases.neo4j.io")</text>
+  <path d="M270,177 V211" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
+  <text x="284" y="199" font-size="10" fill="#16233A">asks the serverless resolver</text>
+  <rect x="60" y="214" width="420" height="70" rx="10" fill="#FDF2EF" stroke="#E1503A" stroke-width="1.5"/>
+  <text x="270.0" y="246.5" font-size="13" fill="#C42B12" text-anchor="middle" font-weight="bold">Serverless resolver (NCC managed DNS)</text>
+  <text x="270.0" y="266.5" font-size="10" fill="#A8776C" text-anchor="middle">the entry comes from the rule's domain_names</text>
+  <path d="M270,287 V321" fill="none" stroke="#C42B12" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <text x="284" y="309" font-size="10" fill="#16233A">returns the NCC private endpoint IP</text>
+  <rect x="60" y="324" width="420" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
+  <text x="270.0" y="356.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Neo4j driver</text>
+  <text x="270.0" y="376.5" font-size="10" fill="#5C6470" text-anchor="middle">opens TLS to that IP, SNI = &lt;aura-id&gt;.databases.neo4j.io</text>
+  <text x="60" y="450" font-size="11" fill="#5C6470">The certificate matches the real Aura hostname.</text>
+  <text x="60" y="468" font-size="11" fill="#5C6470">The client needs no certificate-trust changes.</text>
+  <rect x="640" y="270" width="420" height="254" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <path d="M640,310 V284 a14,14 0 0 1 14,-14 H1046 a14,14 0 0 1 14,14 V310 Z" fill="#2E6DB4"/>
+  <path d="M660,285 L665,290 L660,295 L655,290 Z" fill="#FFFFFF"/>
+  <text x="676" y="295" font-size="14.5" fill="#FFFFFF" font-weight="bold">Neo4j Aura</text>
+  <path d="M483,359 H657" fill="none" stroke="#5C6470" stroke-width="2" marker-end="url(#arrow-dark)"/>
+  <text x="560" y="334" font-size="10.5" fill="#16233A" text-anchor="middle" font-weight="bold">TLS over the</text>
+  <text x="560" y="347" font-size="10.5" fill="#16233A" text-anchor="middle" font-weight="bold">Azure backbone</text>
+  <rect x="660" y="324" width="380" height="70" rx="10" fill="#EAF1FA" stroke="#2E6DB4" stroke-width="1.6"/>
+  <text x="850.0" y="356.5" font-size="13" fill="#1F4F8A" text-anchor="middle" font-weight="bold">Aura PLS</text>
+  <text x="850.0" y="376.5" font-size="10" fill="#5E7FA8" text-anchor="middle">forwards the connection to the Aura cluster</text>
+  <path d="M850,397 V431" fill="none" stroke="#2E6DB4" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+  <rect x="660" y="434" width="380" height="70" rx="10" fill="#EAF1FA" stroke="#2E6DB4" stroke-width="1.6"/>
+  <text x="850.0" y="459.0" font-size="13" fill="#1F4F8A" text-anchor="middle" font-weight="bold">Neo4j Aura VDC</text>
+  <text x="850.0" y="479.0" font-size="10" fill="#5E7FA8" text-anchor="middle">terminates TLS with its real certificate</text>
+  <text x="850.0" y="494.0" font-size="10" fill="#5E7FA8" text-anchor="middle">Bolt proceeds</text>
+</svg>

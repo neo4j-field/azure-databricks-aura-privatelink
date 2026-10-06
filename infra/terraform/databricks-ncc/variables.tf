@@ -55,7 +55,7 @@ variable "aura_pls_resource_id" {
 }
 
 variable "aura_private_hostname" {
-  description = "Neo4j Aura Private URI hostname, e.g. b7253d3b.databases.neo4j.io. Used by NCC-managed DNS to route the hostname to the private endpoint."
+  description = "Neo4j Aura Private URI hostname, e.g. abcd1234.databases.neo4j.io. Used by NCC-managed DNS to route the hostname to the private endpoint."
   type        = string
 }
 

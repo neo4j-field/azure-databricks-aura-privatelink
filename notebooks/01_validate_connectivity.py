@@ -32,7 +32,7 @@ print(f"Database        : {NEO4J_DATABASE}")
 
 # COMMAND ----------
 
-# MAGIC %md ## 2. DNS sanity check — must resolve to a PRIVATE IP
+# MAGIC %md ## 2. DNS sanity check: must resolve to a PRIVATE IP
 
 # COMMAND ----------
 
@@ -53,7 +53,7 @@ assert is_private, (
     f"DNS resolved to a public IP ({ip}). Private Link is NOT in use. "
     "Check that the NCC private endpoint rule includes domain_names and is ESTABLISHED."
 )
-print("OK — resolves to private address space.")
+print("OK: resolves to private address space.")
 
 # COMMAND ----------
 
@@ -128,4 +128,4 @@ print("Driver verify_connectivity() OK.")
 # COMMAND ----------
 
 driver.close()
-print("Validation complete — Private Link path is working end-to-end.")
+print("Validation complete. Private Link path is working end-to-end.")

@@ -161,29 +161,35 @@ SET c.name       = row.name,
     c.updated_at = datetime()
 """
 
-@retry(
-    stop=stop_after_attempt(5),
-    wait=wait_exponential(multiplier=1, min=1, max=16),
-    retry=retry_if_exception_type((ServiceUnavailable, TransientError)),
-    reraise=True,
-)
-def write_batch(rows):
-    with driver.session(database=NEO4J_DATABASE) as session:
-        session.execute_write(lambda tx: tx.run(MERGE_CYPHER, rows=rows).consume())
-
 def write_partition(partition_iter):
-    batch = []
-    for row in partition_iter:
-        d = row.asDict()
-        # Cast timestamp to ISO string so Cypher receives a datetime-compatible value.
-        d["signup_ts"] = d["signup_ts"].isoformat() if d["signup_ts"] is not None else None
-        batch.append(d)
-        if len(batch) >= BATCH_SIZE:
-            write_batch(batch)
-            batch = []
-    if batch:
-        write_batch(batch)
-    return iter([])
+    # Runs on the executors: open a driver per partition and build the retry here,
+    # because the driver and tenacity state hold locks that cannot be pickled.
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=16),
+        retry=retry_if_exception_type((ServiceUnavailable, TransientError)),
+        reraise=True,
+    )
+    def write_batch(conn, rows):
+        with conn.session(database=NEO4J_DATABASE) as session:
+            session.execute_write(lambda tx: tx.run(MERGE_CYPHER, rows=rows).consume())
+
+    with GraphDatabase.driver(
+        NEO4J_URI,
+        auth=(NEO4J_USER, NEO4J_PASSWORD),
+        resolver=aura_private_resolver,
+    ) as conn:
+        batch = []
+        for row in partition_iter:
+            d = row.asDict()
+            # Cast timestamp to ISO string so Cypher receives a datetime-compatible value.
+            d["signup_ts"] = d["signup_ts"].isoformat() if d["signup_ts"] is not None else None
+            batch.append(d)
+            if len(batch) >= BATCH_SIZE:
+                write_batch(conn, batch)
+                batch = []
+        if batch:
+            write_batch(conn, batch)
 
 sample_df.foreachPartition(write_partition)
 print("Write phase complete.")

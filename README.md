@@ -93,7 +93,7 @@ For a CLI-first version of the Databricks steps, see [docs/manual-ncc-setup.md](
 - Creating the NCC and attaching it to the workspace with the Databricks CLI or REST, instead of the console (Steps 4 and 5).
 - Creating the private endpoint rule with the CLI, including several hostnames in `domain_names`.
 - Checking the rule status until it reads `ESTABLISHED`.
-- Adding a `p-*.neo4j.io` routing hostname to an existing rule, without Terraform.
+- Adding a routing hostname such as `p-<aura-id>-<suffix>.<orch>.neo4j.io` to an existing rule.
 - Deleting and recreating an expired or failed rule.
 
 ## Setup Steps (Validated)
@@ -278,12 +278,12 @@ Where:
 - `AURA_PLS_ALIAS` = the Private Link service name returned by the Aura console in Step 2
 - `AURA_PRIVATE_HOSTNAME` = the Private URI hostname from Aura (e.g., `<aura-id>.databases.neo4j.io`)
 
-For Aura VDC routing, the Neo4j driver can also receive `p-*.neo4j.io` Bolt addresses from the routing table. If a validation notebook fails with `Cannot resolve address p-...neo4j.io:7687`, add that hostname to the same private endpoint rule `domain_names` list. The Terraform stack exposes this as `aura_extra_domain_names`.
+For Aura VDC routing, the Neo4j driver can also receive Bolt addresses such as `p-<aura-id>-<suffix>.<orch>.neo4j.io` from the routing table. If a validation notebook fails with `Cannot resolve address p-...neo4j.io:7687`, add that hostname to the same private endpoint rule `domain_names` list. Add each hostname by its full name. The Terraform stack exposes this as `aura_extra_domain_names`.
 
 **If the first apply fails** with `ThirdPartyPrivateLinkService...DoesNotExistOrIsNotVisible`, the request came from a Databricks-managed subscription that Aura does not yet trust. Copy the subscription ID from that error into the Aura allow-list, then retry:
 
 1. In the Aura console, open **Project settings → Security & Networking → Private endpoints** and edit the network access configuration from [Step 2](#step-2-enable-private-link-in-aura-network-access-configuration).
-2. Add the subscription ID from the error to **Target Azure Subscription IDs**.
+2. Add the subscription ID from the error to **Target Azure Subscription IDs**. Do not add subscription IDs from other sources.
 3. Save, then re-run the apply.
 
 After submission the rule will appear in the NCC with status `PENDING`.
@@ -297,7 +297,7 @@ After submission the rule will appear in the NCC with status `PENDING`.
 5. Wait until status reads **Approved**
 6. In the [Account Console](https://accounts.azuredatabricks.net/), go to **Security → Network connectivity configurations**, open your NCC, and select the **Private endpoint rules** tab. Refresh the page. The **Connection status** column for your rule should transition from `PENDING` to `ESTABLISHED`
 
-> A rule that stays in `PENDING`, `REJECTED`, or `DISCONNECTED` for **14 days will expire** and must be recreated. Don't leave half-finished setups.
+> A rule that stays in `PENDING`, `REJECTED`, or `DISCONNECTED` for **14 days will expire** and must be recreated. Don't leave half-finished setups. Approve within a day.
 
 ### Step 8: Verify DNS and Connectivity
 
@@ -342,14 +342,19 @@ for host in [
 
 Notebook 01 maps `p-*.neo4j.io` routing hostnames to the private Aura host, so it does not report an unresolved one as a DNS failure. Use this snippet to check them directly.
 
-### Step 9: Disable Public Access on Aura (Recommended)
+### Step 9: Disable Public Access on Aura
 
-Once validation succeeds:
+Private Link adds a private path. It does not close the public one. Until you disable public access, the instance stays reachable from the internet with only its password. Once validation succeeds:
 
 1. Aura → **Project settings → Security & Networking → Private endpoints**
 2. Toggle **Disable public access**
 3. Wait for status to update. Propagation is not instant; monitor the console
 4. Re-run the validation notebook to confirm private-only access still works
+5. From a machine outside Azure and outside any network linked to your private DNS, confirm the public endpoint is closed. The connection must fail or time out. A success means public access is still on.
+
+   ```bash
+   nc -vz -w 5 <aura-id>.databases.neo4j.io 7687
+   ```
 
 ---
 
@@ -433,6 +438,8 @@ To remove the Databricks side, follow [docs/teardown.md](docs/teardown.md). It c
 | 14-day expiry on unapproved rules | Approve promptly in Aura console |
 | 10-minute NCC propagation after attach | Wait, then restart serverless services |
 | Aura Private Link is region-scoped, not instance-scoped | Plan multi-region setups accordingly |
+| Private Link does not close the public endpoint | Complete Step 9 and run its outside-in check |
+| An NCC does not restrict other outbound traffic from serverless compute | This repo does not configure serverless egress control. If you add a restricted network policy, allow the Aura hostnames and any package index your notebooks use, such as PyPI for `%pip install` |
 
 ---
 

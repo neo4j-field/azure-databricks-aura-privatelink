@@ -97,7 +97,7 @@ The rule starts as `PENDING`.
 
 The error text contains `ThirdPartyPrivateLinkServiceProvidedDuringPrivateEndpointCreationDoesNotExistOrIsNotVisible`. The request came from a Databricks-managed Azure subscription that the Aura allow-list does not include yet.
 
-1. Find the subscription ID in the error. It appears in a path like `/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...`.
+1. Find the subscription ID in the error. It appears in a path like `/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...`. Add only a GUID from your own failed call. Do not add subscription IDs from other sources.
 2. In the Aura console, add that GUID to **Target Azure Subscription IDs**, as in [README Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration).
 3. Wait about a minute, then run the create call again.
 
@@ -134,7 +134,7 @@ curl -s -X POST "${BASE}/network-connectivity-configs/${NCC_ID}/private-endpoint
 
 ## Step 4: Approve the endpoint in Aura
 
-Approve the incoming request in the Aura console, as in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console). A rule that stays `PENDING`, `REJECTED`, or `DISCONNECTED` for 14 days expires.
+Approve the incoming request in the Aura console, as in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console). Approve within a day, because a rule that stays `PENDING`, `REJECTED`, or `DISCONNECTED` for 14 days expires.
 
 ## Step 5: Check the rule status
 
@@ -151,6 +151,10 @@ databricks --profile "$ACCOUNT_PROFILE" account network-connectivity \
 ## Step 6: Restart serverless compute and validate
 
 Restart running SQL warehouses and serverless jobs so they pick up the NCC-managed DNS. Then create the secret scope, upload the notebooks, and run the validation notebook. All of these are in [README Step 8](../README.md#step-8-verify-dns-and-connectivity).
+
+## Step 7: Close the public endpoint
+
+Private Link adds a private path. It does not close the public one. Disable public access in the Aura console, as in [README Step 9](../README.md#step-9-disable-public-access-on-aura). Run the outside-in check from that step, then re-run the validation notebook.
 
 ## Add a routing hostname later
 
@@ -178,6 +182,10 @@ databricks --profile "$ACCOUNT_PROFILE" account network-connectivity \
 ```
 
 A rule in `PENDING` or `EXPIRED` is deleted at once. A rule in any other state is deactivated and removed after one day.
+
+## What the NCC does not cover
+
+The NCC adds a private path to Aura. It does not block other outbound traffic from serverless compute. A serverless egress policy in restricted access mode does that, and this guide does not create one. If you add one, allow the Aura hostnames and the hosts your notebooks need, such as PyPI for `%pip install`.
 
 ## Teardown
 

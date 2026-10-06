@@ -8,7 +8,7 @@ This repo connects Azure Databricks serverless compute to Neo4j Aura over Azure 
 
 The design is sound. Private endpoint connections need manual approval. The VM has no public IP. The jump box NSG denies all other inbound traffic. The git history holds no secrets.
 
-The main gaps sit around the design, not inside the Terraform syntax. The Aura public endpoint is never verified as closed. Serverless egress is open. Every notebook uses one shared admin database account. Fix these three first.
+The main gaps sit around the design, not inside the Terraform syntax. No script verifies that the Aura public endpoint is closed. Serverless egress is open. Every notebook uses one shared admin database account. Fix these three first.
 
 No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findings.
 
@@ -38,7 +38,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 | ID | Severity | Finding |
 |----|----------|---------|
-| H1 | High | Aura public access stays on and nothing checks that it is off |
+| H1 | High | Aura public access stays on and no script checks that it is off |
 | H2 | High | Serverless egress is open to the internet |
 | H3 | High | One shared admin database account serves every notebook |
 | M1 | Medium | Secrets and state files sit on disk in plaintext with open permissions |
@@ -61,14 +61,13 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ## High findings
 
-### H1. Aura public access stays on and nothing checks that it is off
+### H1. Aura public access stays on and no script checks that it is off
 
-- **Where:** The setup guidance sits in `docs/private-endpoint-stack-setup.md` line 89 and README Step 9.
-- **Risk:** Private Link protects traffic only when the public endpoint is off. The docs say to turn public access off after validation. No script, test, or checklist item confirms it. Until then, the admin account is reachable from the internet with only a password.
+- **Where:** The setup guidance sits in `docs/private-endpoint-stack-setup.md` line 89. `scripts/automate.py` never mentions the step.
+- **Risk:** Private Link protects traffic only when the public endpoint is off. The docs say to turn public access off after validation. No script confirms it. Until then, the admin account is reachable from the internet with only a password.
 - **Impact:** The private path adds no protection while the public path stays open.
 - **Fix:** Add a final "definition of done" step to `scripts/automate.py` that prints a required manual action to disable public traffic in the Aura console.
-- **Fix:** Add an outside-in test. From a host outside Azure, a Bolt connection to the public hostname must fail.
-- **Fix:** Record the result in `docs/validation-report.md`.
+- **Fix:** Record the outside-in result in `docs/validation-report.md`.
 - **Fix:** Confirm the live Aura setting now. This review could not check it.
 
 ### H2. Serverless egress is open to the internet
@@ -106,7 +105,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ### M2. The public repo carries real identifiers and has no secret scanning
 
-- **Where:** The GitHub repo `neo4j-field/azure-databricks-aura-privatelink` is public. `README.md` and `docs/automate-tf-ncc-setup.md` line 49 hold the Databricks account ID and workspace host. `notebooks/04_smoke_test.py` hardcodes an Aura hostname and a workspace name.
+- **Where:** The GitHub repo `neo4j-field/azure-databricks-aura-privatelink` is public. `docs/automate-tf-ncc-setup.md` line 49 holds the Databricks account ID and workspace host. `README.md` now holds only placeholders. `notebooks/04_smoke_test.py` hardcodes an Aura hostname and a workspace name.
 - **Risk:** These values are identifiers, not credentials. They still map your environment for phishing and targeted attacks.
 - **Risk:** The repo has no CI, no secret scanning, and no pre-commit checks. A future mistake would ship a real secret to a public repo.
 - **Fix:** Replace real values in tracked files with placeholders. Read them from environment variables or tfvars.
@@ -157,7 +156,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 - **Risk:** Aura routing hosts such as `p-...` need their own records. A missing record breaks the connection, and operators then loosen settings to make it work.
 - **Risk:** A DNS wildcard must be the whole label `*`. A record named `p-*` matches nothing. A real `*` record would point every Aura hostname at your endpoint.
 - **Fix:** Add a routing-hostname list variable. Create a private DNS zone and VNet link for each distinct `<orch>.neo4j.io` domain, then one A record per routing host. See T6.
-- **Fix:** Correct the README. Tell operators to add explicit records.
+- **Fix:** Correct the wildcard advice in `docs/architecture.md` line 133. Tell operators to add explicit records.
 - **Fix:** Do not enable the NxDomainRedirect fallback on the zone link. It sends unresolved names to public DNS.
 
 ### M8. The Aura subscription allow-list and approval step need tighter control
@@ -165,9 +164,9 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 - **Where:** `docs/automate-tf-ncc-setup.md` step 2 tells the operator to add a Databricks-managed subscription ID to the Aura allow-list. The text says this "can iterate".
 - **Risk:** The allow-list lets that subscription request connections to your PLS. A Databricks-managed subscription is not yours, and it can host endpoints for other customers. Confirm this with Databricks.
 - **Risk:** Manual approval is then the only control. A pending request can sit for 14 days.
-- **Fix:** Before approving, match the pending request to the endpoint named in the NCC rule output. Reject any request that does not match.
-- **Fix:** Approve within a day and reject stale requests.
-- **Fix:** Remove allow-list entries that you no longer need.
+- **Fix:** Before approving, match the pending request to the endpoint named in the NCC rule output. Reject any request that does not match. This waits on someone with Aura console access, who must confirm what identifier the console shows.
+- **Fix:** Reject stale requests.
+- **Fix:** Remove allow-list entries that you no longer need. Confirm with Databricks first that removing an entry does not affect an established rule.
 - **Fix:** Add a reminder or alert for requests that stay pending.
 
 ### M9. Providers, packages, and images float and the lock file is ignored
@@ -259,16 +258,46 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 - **Secret handling in code:** Notebooks read credentials from `dbutils.secrets`. `scripts/automate.py` writes secrets through the SDK, not a shell command.
 - **Guard rails:** `notebooks/04_smoke_test.py` asserts the host before it runs, and the shell scripts use `set -euo pipefail`.
 
-## Recommended order of work
+## Doc changes already applied
 
-1. **Close Aura public access:** Confirm the setting, then add the outside-in test from H1.
-2. **Restrict serverless egress:** Apply a restricted network policy that lists only the Aura hostnames, as in H2.
-3. **Replace the admin account:** Create least-privilege Aura users and lock the secret scope with ACLs, as in H3.
-4. **Protect local secrets:** Run `chmod 600` on the sensitive files and move state to a remote backend, as in M1.
-5. **Clean the public repo:** Replace identifiers with placeholders and turn on secret scanning, as in M2.
-6. **Add a review gate:** Show the plan before apply and remove the default profile, as in M3.
-7. **Harden the relay and subnet:** Add `bind=127.0.0.1` to socat and enable network policies on the PE subnet, as in M5 and M6.
-8. **Pin dependencies:** Commit the lock files and pin packages, as in M9.
+These edits to `README.md` and `docs/manual-ncc-setup.md` are done. They are doc-only and do not change the setup flow.
+
+- **H1:** README Step 9 now says Private Link does not close the public endpoint. It adds an outside-in `nc` check. `docs/manual-ncc-setup.md` has a new Step 7 that points to it. The README Limitations table has a matching row.
+- **H2:** The README Limitations table and a new "What the NCC does not cover" section in `docs/manual-ncc-setup.md` say the NCC does not restrict other outbound traffic. The Terraform fix (T5) is still open.
+- **M7:** The README and the manual guide name routing hostnames in full form, `p-<aura-id>-<suffix>.<orch>.neo4j.io`, instead of `p-*.neo4j.io`.
+- **M8:** Both docs say to add only the subscription ID from your own failed call. Both say to approve within a day.
+
+## Recommendations by area
+
+Each group lists the open work in severity order. The finding sections above hold the detail.
+
+### Setup docs
+
+- **H1:** Record the outside-in result in `docs/validation-report.md`. Confirm the live Aura public access setting. This needs Aura console access.
+- **M2:** Replace the real identifiers in `docs/automate-tf-ncc-setup.md` line 49 with placeholders.
+- **M6:** Set `allow_forwarded_traffic = false` in the examples in `docs/batch-jobs-other-vnets.md` lines 82 and 91.
+- **M7:** Correct the wildcard advice in `docs/architecture.md` line 133.
+- **M8:** Match each pending request to the rule before approving. This needs Aura console access. Confirm with Databricks before removing allow-list entries.
+- **M10:** Update the service principal wording in the README, line 60, and `docs/automate-tf-ncc-setup.md`. This waits for T4, so it is deferred.
+- **L6:** Correct `docs/architecture.md` lines 53 and 108. Correct the multi-instance advice in `docs/batch-jobs-other-vnets.md`.
+- **L7:** Update `docs/developer-desktop-access.md` for the Microsoft-registered VPN app ID and Conditional Access.
+
+### Terraform
+
+Findings H2, M1, M5, M6, M7, M9, M10, L1, L2, and L5 need Terraform changes. The next section lists them as T1 to T11. The order and the phased plan follow it.
+
+### Scripts and notebooks
+
+These findings fit neither group above.
+
+- **H1:** Add a "definition of done" step to `scripts/automate.py` that prints the manual action to disable public access.
+- **H3:** Create least-privilege Aura users. Use one secret scope per purpose, with ACLs.
+- **M1:** Run `chmod 600` on `.env`, the tfvars file, and every state file.
+- **M2:** Replace the hardcoded Aura hostname and workspace name in `notebooks/04_smoke_test.py`. Turn on secret scanning and add pre-commit and CI checks.
+- **M3:** Plan before apply, remove the default `--workspace-profile`, and confirm before `delete_scope`.
+- **M4:** Pipe secret values on standard input in `scripts/create-secret-scope.sh`. Replace the raw bearer token in `scripts/create-private-endpoint-rule.sh`. The curl examples in README Step 6 and the REST section of `docs/manual-ncc-setup.md` use the same header pattern. They stay unchanged.
+- **L3:** Import notebooks to a per-user folder and guard the `DETACH DELETE` demos.
+- **L4:** Compare DNS answers to the PE subnet in `scripts/validate-dns.py` and notebook 01.
 
 ## Terraform changes needed
 

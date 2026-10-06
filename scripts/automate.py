@@ -27,7 +27,7 @@ Auth uses the Databricks SDK with CLI-profile OAuth:
   - --workspace-profile targets the workspace URL (secrets, jobs, warehouses)
 
 Configure the account profile once (Phase 1 prerequisite):
-  databricks auth login --host https://accounts.azuredatabricks.net --account-id <account-id>
+  databricks auth login --host https://accounts.azuredatabricks.net --account-id <account-id> --profile <name>
 
 Aura credentials come from the repo-root .env (loaded at startup via python-dotenv):
   NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, and optional NEO4J_DATABASE (default neo4j).
@@ -94,6 +94,9 @@ ROUTING_HOST_RE = re.compile(
 )
 
 # NCC private endpoint rule connection states.
+# Single source of truth for the Aura console location used in printed instructions.
+AURA_PRIVATE_ENDPOINTS_PATH = "Project settings -> Security & Networking -> Private endpoints"
+
 STATE_ESTABLISHED = "ESTABLISHED"
 STATE_PENDING = "PENDING"
 STATE_TERMINAL_BAD = {"REJECTED", "DISCONNECTED", "EXPIRED", "CREATE_FAILED"}
@@ -207,7 +210,7 @@ def _print_allowlist_instruction(error_text: str) -> None:
         )
     print(
         "To fix:\n"
-        "  1. Open the Aura console -> your instance -> Network Access.\n"
+        f"  1. Open the Aura console -> {AURA_PRIVATE_ENDPOINTS_PATH}.\n"
         "  2. Add the subscription ID above to 'Target Azure Subscription IDs'.\n"
         "  3. Re-run this command. Databricks may retry from more than one managed\n"
         "     subscription per region, so this can iterate - add each ID it surfaces.\n"
@@ -287,7 +290,7 @@ def poll_rule(account_client, outputs: TerraformOutputs, timeout: int, interval:
 def _print_approval_instruction() -> None:
     print(
         "\n  ACTION REQUIRED - approve the private endpoint in the Aura console:\n"
-        "    Security -> Network Access -> Pending approvals -> Approve.\n"
+        f"    {AURA_PRIVATE_ENDPOINTS_PATH} -> approve the pending request.\n"
         "  Polling will continue in case you have already approved it...\n"
     )
 
@@ -481,7 +484,7 @@ def make_account_client(profile: str | None):
             "An account-console profile is required to poll the NCC rule.\n"
             "Configure one, then pass --account-profile <name>:\n"
             "  databricks auth login --host https://accounts.azuredatabricks.net "
-            "--account-id <account-id>"
+            "--account-id <account-id> --profile <name>"
         )
     return AccountClient(profile=profile)
 

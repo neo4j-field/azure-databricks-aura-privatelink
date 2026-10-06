@@ -21,7 +21,7 @@ pe_subnet_name           = "REPLACE_WITH_PE_SUBNET_NAME"      # e.g., snet-priva
 # It is a hint, not enforced. Keep it lowercase and hyphen-delimited.
 private_endpoint_name = "REPLACE_WITH_PE_NAME"
 
-# Aura targets — from Aura console -> Security -> Network Access.
+# Aura targets — from the Aura console (see README Step 2).
 aura_pls_alias   = "REPLACE_WITH_AURA_PLS_ALIAS"              # e.g., production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
 aura_instance_id = "REPLACE_WITH_AURA_INSTANCE_ID"            # the dbid, e.g., abcd1234
 

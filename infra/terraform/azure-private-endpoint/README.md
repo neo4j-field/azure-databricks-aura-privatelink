@@ -25,7 +25,7 @@ For **Azure Databricks Serverless**, use the **NCC stack** [`../databricks-ncc/`
 
 - Terraform >= 1.6.0
 - An existing VNet and subnet that will host the PE NIC. The subnet must allow private endpoints (default for modern subnets).
-- The subscription you are deploying into is **already registered** in the Aura console under *Network Access -> Target Azure Subscription IDs*. Without this, the PLS connection request will not appear in Aura for approval.
+- The subscription you are deploying into is **already registered** in the Aura console under **Target Azure Subscription IDs** ([README Step 2](../../../README.md#step-2-enable-private-link-in-aura-network-access-configuration)). Without this, the PLS connection request will not appear in Aura for approval.
 - Azure credentials (CLI login, environment variables, or managed identity) with permission to create PEs and private DNS zones in the target RG.
 
 ## Usage
@@ -41,7 +41,7 @@ terraform apply
 
 After apply:
 
-1. Approve the incoming endpoint in the Aura console (*Security -> Network Access -> Pending approvals*).
+1. Approve the incoming endpoint in the Aura console (see [README Step 7](../../../README.md#step-7-approve-the-private-endpoint-in-the-aura-console)).
 2. Verify resolution from any VM in the linked VNet:
    ```bash
    nslookup <aura-instance-id>.databases.neo4j.io

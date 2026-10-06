@@ -94,7 +94,7 @@ Neo4j Aura falls under **Resources behind a Standard Load Balancer**. This categ
 
 | Failure | Symptom | Recovery |
 |---------|---------|----------|
-| Subscription not registered in Aura Network Access | PE creation in Azure succeeds but Aura never sees the request | Add the subscription ID in the Aura console ([Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration)), then re-create the rule ([Step 6](../README.md#step-6-add-a-private-endpoint-rule-for-neo4j-aura-pls)) |
+| Subscription not registered in the Aura network access configuration | PE creation in Azure succeeds but Aura never sees the request | Add the subscription ID in the Aura console ([Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration)), then re-create the rule ([Step 6](../README.md#step-6-add-a-private-endpoint-rule-for-neo4j-aura-pls)) |
 | `domain_names` omitted in NCC rule | DNS resolves to public Aura IP; connection works but isn't private | Update the rule with a PATCH request (`?update_mask=domain_names`), then restart serverless |
 | NCC attached but services not restarted | Existing sessions still use old routing | Restart all serverless compute (SQL warehouses, running jobs) |
 | Rule expired (14 days in PENDING) | NCC rule disappears or is in `EXPIRED` state | Re-create the rule via API; re-approve in Aura console |

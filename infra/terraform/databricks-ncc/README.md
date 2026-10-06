@@ -15,7 +15,7 @@ Use this stack (the **NCC stack**) when your consumer is **Azure Databricks Serv
 - An identity that is an **Azure Databricks account admin**. Two supported paths:
   - **Azure CLI auth (default in this stack)**: be signed in via `az login` as a user that's in the Account Admins group at `accounts.azuredatabricks.net → User management → Admins`. Leave `azure_client_id` / `azure_client_secret` / `azure_tenant_id` unset.
   - **Service principal (for CI/CD)**: create an SP, grant it account-admin in the Databricks Account Console, fill the three `azure_*` variables.
-- The Aura side has Private Link enabled and the right subscriptions are registered in its Network Access config (see *Third-party PLS visibility* below)
+- The Aura side has Private Link enabled and the right subscriptions are registered in its network access configuration (see *Third-party PLS visibility* below)
 - The target Databricks workspace already exists; this stack only attaches the NCC to it
 
 ## Usage
@@ -35,14 +35,14 @@ terraform apply tfplan
 
 After a successful apply:
 
-1. Approve the incoming PE in the Aura console (*Security → Network Access → Pending approvals*).
+1. Approve the incoming PE in the Aura console (see [README Step 7](../../../README.md#step-7-approve-the-private-endpoint-in-the-aura-console)).
 2. Refresh the NCC view in the Databricks account console. The rule status should transition from `PENDING` to `ESTABLISHED` (usually under a minute).
 3. Restart any running serverless compute in the workspace (SQL warehouses, jobs).
 4. Run a smoke-test notebook from the workspace to validate the private path.
 
 ## Third-party PLS visibility (must-read for Aura)
 
-When the NCC creates the PE on Databricks' side, the request originates from a **Databricks-managed Azure subscription** for the workspace's region, not from your subscription. Aura's PLS enforces a visibility allow-list ("Target Azure Subscription IDs" in the Aura Network Access wizard), and if the Databricks-managed sub isn't on that list, Azure rejects PE creation with:
+When the NCC creates the PE on Databricks' side, the request originates from a **Databricks-managed Azure subscription** for the workspace's region, not from your subscription. Aura's PLS enforces a visibility allow-list ("Target Azure Subscription IDs" in the Aura network access configuration), and if the Databricks-managed sub isn't on that list, Azure rejects PE creation with:
 
 ```
 ThirdPartyPrivateLinkServiceProvidedDuringPrivateEndpointCreationDoesNotExistOrIsNotVisible
@@ -52,7 +52,7 @@ The failed `terraform apply` exposes the right sub ID in its error message. Look
 
 **Fix:**
 
-1. Open the Aura console → **Security → Network Access** → edit the configuration for the Aura instance's region.
+1. Open the Aura private endpoints page, as described in [README Step 2](../../../README.md#step-2-enable-private-link-in-aura-network-access-configuration). Edit the configuration for the Aura instance's region.
 2. **Add subscription ID** → paste the Databricks-managed sub from the error path. Keep your existing subs in the list.
 3. Save and wait ~1 minute.
 4. Re-run `terraform plan -out=tfplan && terraform apply tfplan`.

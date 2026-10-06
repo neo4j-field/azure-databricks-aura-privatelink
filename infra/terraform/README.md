@@ -15,12 +15,12 @@ The two stacks are independent root modules. You can apply only one, only the ot
 
 ## Important gotcha for the NCC stack with third-party PLS
 
-When the NCC creates the PE, the request originates from the **Databricks-managed subscription** for that region, not yours. Aura's PLS has a visibility allow-list ("Target Azure Subscription IDs" in the Aura Network Access wizard) and will reject PE creation from a sub that isn't on it. Symptoms:
+When the NCC creates the PE, the request originates from the **Databricks-managed subscription** for that region, not yours. Aura's PLS has a visibility allow-list ("Target Azure Subscription IDs" in the Aura network access configuration) and will reject PE creation from a sub that isn't on it. Symptoms:
 
 ```
 ThirdPartyPrivateLinkServiceProvidedDuringPrivateEndpointCreationDoesNotExistOrIsNotVisible
 ```
 
-The Databricks-managed sub appears in the error path of the failed `terraform apply` (`/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...`). Take that sub ID, add it to the Aura Network Access config for the corresponding Aura region (alongside your own sub), wait ~1 minute, and re-apply.
+The Databricks-managed sub appears in the error path of the failed `terraform apply` (`/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...`). Take that sub ID, add it to the Aura network access configuration for the corresponding Aura region (alongside your own sub), wait ~1 minute, and re-apply.
 
 This is **not** documented in Neo4j or Microsoft public docs; it's a known operational gotcha for NCC + third-party PLS. See [`databricks-ncc/README.md`](databricks-ncc/README.md#third-party-pls-visibility-must-read-for-aura) for the troubleshooting recipe.

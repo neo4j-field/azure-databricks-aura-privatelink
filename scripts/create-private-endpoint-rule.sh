@@ -73,7 +73,7 @@ echo
 echo "Rule created with ID: ${RULE_ID}"
 echo
 echo "Next steps:"
-echo "  1. Open the Aura console -> Security -> Network Access"
+echo "  1. Open the Aura console private endpoints page (README Step 7)"
 echo "  2. Approve the incoming private endpoint request"
 echo "  3. Wait until the rule status reads ESTABLISHED in the Databricks NCC view"
 echo "  4. Restart any running serverless compute, then run the validation notebook"

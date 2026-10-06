@@ -63,7 +63,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "neo4j" {
 #
 # The PLS alias is the canonical handle Azure exposes for cross-tenant PLS
 # consumption. The Aura side must have the consumer subscription registered
-# in its Network Access config before the connection request will appear in
+# in its network access configuration before the connection request will appear in
 # the Aura console for approval.
 # ----------------------------------------------------------------------------
 resource "azurerm_private_endpoint" "aura" {
@@ -138,7 +138,7 @@ output "next_steps" {
     Private endpoint submitted to Aura PLS.
 
     Next:
-    1. Open the Aura console -> Security -> Network Access -> Pending approvals.
+    1. Open the Aura console private endpoints page (README Step 7 in the repo root).
     2. Approve the incoming endpoint request from this subscription.
     3. Confirm the PE shows `Approved` in the Azure portal.
     4. From any VM/cluster in the linked VNet, verify DNS resolution:

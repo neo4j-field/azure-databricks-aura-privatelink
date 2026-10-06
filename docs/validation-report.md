@@ -33,10 +33,10 @@ Reconciliation of the original draft guide "Neo4j Aura PrivateLink + Azure Datab
 
 **Missing in the draft:**
 
-1. **Target Azure Subscription ID registration** in Aura Network Access config. For Databricks Serverless NCC, the private endpoint request comes from a Databricks-managed Azure subscription; without that subscription on Aura's allow-list, the PE request never surfaces for approval.
+1. **Target Azure Subscription ID registration** in the Aura network access configuration. For Databricks Serverless NCC, the private endpoint request comes from a Databricks-managed Azure subscription; without that subscription on Aura's allow-list, the PE request never surfaces for approval.
 2. **Region-scoped, not instance-scoped**: enabling Private Link applies to all instances in the region under the tenant.
 3. **Private URI vs Connection URI**: each instance gets a separate Private URI after Private Link is enabled.
-4. **Exact console path**: Security → Network Access → Network Access → New network access configuration.
+4. **Exact console path**: Project settings → Security & Networking → Private endpoints → New network access configuration. This path is maintained in [README Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration).
 
 ### Step 2: Databricks Workspace
 

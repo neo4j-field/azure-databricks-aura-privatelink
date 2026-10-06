@@ -153,8 +153,8 @@ Private Link Service allows multiple consumers from different subscriptions.
 
 ### Step 1: Register the batch subscription in Aura
 
-Open the Aura console → **Security → Network Access → Network Access** →
-edit the network access configuration and add the batch subscription ID to the
+Open the Aura private endpoints page, as described in [README Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration).
+Edit the network access configuration and add the batch subscription ID to the
 **Target Azure Subscription IDs** list. This allowlists incoming connection
 requests from the batch subscription.
 
@@ -185,7 +185,7 @@ terraform apply -var-file="batch.tfvars"
 
 The new Private Endpoint creates a pending connection request in Aura.
 
-1. Aura console → **Security → Network Access**
+1. Open the Aura private endpoints page, as described in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console)
 2. Locate the pending request from the batch subscription
 3. Click **Accept**
 4. Wait for status to reach **Approved**
@@ -289,7 +289,7 @@ and Terraform adds a second A record in the same zone.
 |---------|-------|-----|
 | `nslookup` returns public IP from batch VM | DNS zone not linked to batch VNet | Add VNet link (Option A Step 2) |
 | VNet link exists but `nslookup` still returns public IP | Peering not established; DNS traffic not reaching the zone | Confirm peering is in **Connected** state; also check that the batch VM's DNS is Azure DNS (168.63.129.16) |
-| PE connection request stuck in **Pending** in Aura | Batch subscription not in Aura's subscription allowlist | Add batch subscription ID in Aura Network Access console (Option B Step 1) |
+| PE connection request stuck in **Pending** in Aura | Batch subscription not in Aura's subscription allowlist | Add batch subscription ID in the Aura private endpoints page (Option B Step 1) |
 | AKS CoreDNS returns public IP despite VNet link | AKS uses custom DNS server not forwarding to Azure DNS | Add a conditional forwarder for `databases.neo4j.io` to `168.63.129.16` in the custom DNS server |
 | Databricks NCC rule stays **PENDING** | Wrong subscription ID in Aura NCC managed subscription list | Remove and re-add the NCC workspace binding with the correct Databricks-managed subscription ID |
 | Connection refused from ADF Azure IR | Azure IR cannot be peered to customer VNet | Switch to self-hosted IR in the batch VNet |

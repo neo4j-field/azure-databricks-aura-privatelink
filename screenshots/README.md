@@ -17,7 +17,7 @@ The screenshots are numbered in the chronological order an operator would see th
 
 | # | File | Stage | What it shows |
 |---|------|-------|---------------|
-| 01 | `01-aura-network-access-overview.png` | Aura prep | Aura *Network Access* page. It confirms `uksouth` region has `Private traffic: Enabled` and `Public traffic: Disabled` |
+| 01 | `01-aura-network-access-overview.png` | Aura prep | Aura *Private endpoints* page. It confirms `uksouth` region has `Private traffic: Enabled` and `Public traffic: Disabled` |
 | 02 | `02-aura-network-access-config-subscriptions.png` | Aura prep | *Edit network access configuration* wizard, Step 1 of 4: the Target Azure Subscription IDs registered for inbound PrivateLink (must include the consumer subscription) |
 | 03 | `03-aura-pls-service-name-and-instructions.png` | Aura prep | Wizard Step 2 of 4: the PLS service name (`production-orch-<id>-service.<guid>.uksouth.azure.privatelinkservice`) and the Aura-provided Azure Portal instructions |
 | 04 | `04-terraform-apply-success.png` | Apply | Output of `terraform apply` in `infra/terraform/azure-private-endpoint/`: `Apply complete! Resources: 4 added`, with the `private_endpoint_nic_ip = 172.16.0.6` output |

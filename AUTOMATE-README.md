@@ -36,17 +36,29 @@ then re-run).
    az account set --subscription <SUB_ID>
    ```
 
+   To find the tenant ID in the Azure portal, open **Microsoft Entra ID** and read **Tenant ID**
+   under **Basic information** on the **Overview** page. From the CLI, run
+   `az account show --query tenantId -o tsv`. Use the tenant that owns the subscription your
+   Databricks workspace is deployed in. The subscription ID is a separate value, listed under
+   **Subscriptions** in the portal.
+
 3. **Workspace CLI profile** (default `azure-rk-knight`) exists and authenticates:
 
    ```bash
    databricks --profile azure-rk-knight current-user me
    ```
 
+   If it reports stored credentials from an older CLI version, sign in again:
+
+   ```bash
+   databricks auth login --host https://adb-1098933906466604.4.azuredatabricks.net --profile azure-rk-knight
+   ```
+
 4. **Account-console CLI profile.** NCC rule polling targets `accounts.azuredatabricks.net`,
    a different auth context from the workspace. Configure it once:
 
    ```bash
-   databricks auth login --host https://accounts.azuredatabricks.net --account-id 16604dc9-1c39-4d73-95a3-7d75ce00a12b
+   databricks auth login --host https://accounts.azuredatabricks.net --account-id 16604dc9-1c39-4d73-95a3-7d75ce00a12b --profile azure-neo4j-account
    ```
 
    Verify it lists NCCs (this repo uses the `azure-neo4j-account` profile):
@@ -139,7 +151,7 @@ not yet trust. The orchestrator prints the managed subscription GUID and exits w
 
 Do this, then re-run:
 
-1. Open the Aura console, your instance, Network Access.
+1. Open the Aura private endpoints page, as described in [README Step 2](README.md#step-2-enable-private-link-in-aura-network-access-configuration).
 2. Add the printed subscription GUID to **Target Azure Subscription IDs**.
 3. Re-run the same command:
 
@@ -158,7 +170,7 @@ the approval instruction and exits `2` if it does not reach `ESTABLISHED` within
 
 Do this, then re-run:
 
-1. In the Aura console: Security, Network Access, Pending approvals, Approve.
+1. Approve the private endpoint in the Aura console, as described in [README Step 7](README.md#step-7-approve-the-private-endpoint-in-the-aura-console).
 2. Re-run the same command. The poller observes `ESTABLISHED` and continues.
 
 A rule left `PENDING` for 14 days expires; the poller warns as it approaches that limit. If a

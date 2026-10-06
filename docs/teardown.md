@@ -57,7 +57,7 @@ The `state rm` drops the already-deleted NCC from Terraform state so the stack r
 
 ## Step 4: Aura-side cleanup (manual, no API)
 
-1. Aura console → **Security → Network Access**: remove the now-orphaned private endpoint approval.
+1. Open the Aura private endpoints page, as described in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console). Remove the now-orphaned private endpoint approval.
 2. Optionally remove the Databricks-managed subscription from **Target Azure Subscription IDs** if nothing else uses it.
 
 The `neo4j` secret scope and the imported validation notebook remain in the workspace; delete them by hand for a full reset.

@@ -67,14 +67,14 @@ driver = GraphDatabase.driver(
 
 **Possible causes:**
 
-1. **Subscription not registered in Aura**: The Databricks-managed Azure subscription ID was not added to the Aura Network Access configuration.
+1. **Subscription not registered in Aura**: The Databricks-managed Azure subscription ID was not added to the Aura network access configuration.
 2. **Approval pending in Aura console**: The request is sitting unapproved in the Aura UI.
 3. **Wrong region**: NCC region does not match where the Aura PLS is exposed.
 
 **Diagnosis order:**
 
-1. Check Aura → Security → Network Access for an incoming request. Approve it if present.
-2. If no request appears, verify the subscription ID in the Aura Network Access config matches the Databricks-managed subscription shown in the Terraform/Azure error path. Databricks may use more than one managed subscription per region, so repeat this for each new `/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...` value exposed by retries.
+1. Check the Aura private endpoints page for an incoming request, as described in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console). Approve it if present.
+2. If no request appears, verify the subscription ID in the Aura network access configuration matches the Databricks-managed subscription shown in the Terraform/Azure error path. Databricks may use more than one managed subscription per region, so repeat this for each new `/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...` value exposed by retries.
 3. Verify regions align.
 
 **Note:** Rules in `PENDING` for 14 days **expire** automatically. If you suspect this happened, recreate the rule.

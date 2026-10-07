@@ -47,7 +47,6 @@ Both options start with [Before you start](#before-you-start) and finish with [D
   - [Create a classic cluster](#create-a-classic-cluster)
   - [Run the validation notebook](#run-the-validation-notebook)
   - [Add routing-host records](#add-routing-host-records)
-  - [Run the other notebooks](#run-the-other-notebooks)
   - [Close the public endpoint](#close-the-public-endpoint)
   - [Teardown](#teardown)
   - [What's next](#whats-next)
@@ -354,11 +353,10 @@ The Azure side is done. Both options leave you with a private endpoint, an appro
 2. [Create the Neo4j secret scope](#create-the-neo4j-secret-scope) in the workspace.
 3. [Upload the notebooks](#upload-the-notebooks).
 4. [Create a classic cluster](#create-a-classic-cluster).
-5. [Run the validation notebook](#run-the-validation-notebook). The first run is expected to fail on routing hosts.
-6. [Add routing-host records](#add-routing-host-records) for the hosts the notebook names, then restart the cluster and run the notebook again.
-7. [Run the other notebooks](#run-the-other-notebooks).
-8. [Close the public endpoint](#close-the-public-endpoint). Do this only after validation succeeds.
-9. [Teardown](#teardown) when you no longer need the setup.
+5. [Run the validation notebook](#run-the-validation-notebook) (`01`). The first run is expected to fail on routing hosts.
+6. [Add routing-host records](#add-routing-host-records) for the hosts the notebook names, then restart the cluster and run `01` again. After it passes, run notebooks `02`, `03`, and `04` from the same section.
+7. [Close the public endpoint](#close-the-public-endpoint). Do this only after validation succeeds.
+8. [Teardown](#teardown) when you no longer need the setup.
 
 > **The workspace must be VNet-injected.** Every Databricks step below runs on a classic cluster in your VNet. A workspace in a Databricks-managed VNet cannot use this path, and neither can serverless compute. Use the [NCC manual setup](setup-ncc-manual.md) for those.
 
@@ -466,16 +464,39 @@ Create a classic compute in your Databricks workspace. The notebooks must run on
 
 ### Run the validation notebook
 
-Run the notebooks in the workspace, not from the CLI:
+Run the notebooks in the workspace, not from the CLI. Attach each one to your running classic compute. There are four, and you run them in number order:
+
+| Notebook | What it checks | Widgets |
+|----------|----------------|---------|
+| [`01_validate_connectivity`](../pl-notebooks/01_validate_connectivity.py) | DNS, the Bolt port, routing hosts, and a Bolt query | `expected_pe_ip`, `use_resolver` |
+| [`02_delta_to_neo4j`](../pl-notebooks/02_delta_to_neo4j.py) | A Delta table round trip | `use_resolver` |
+| [`03_push_pull_demo`](../pl-notebooks/03_push_pull_demo.py) | A 20-row push and an aggregate pull | `use_resolver` |
+| [`04_smoke_test`](../pl-notebooks/04_smoke_test.py) | The DNS and routing-host checks, then a 100-row write and read-back | `expected_pe_ip`, `use_resolver` |
+
+Start with `01`. Its first run is expected to fail at check 3, so add the routing-host records, restart the cluster, and run `01` again, as in [Add routing-host records](#add-routing-host-records). Run `02`, `03`, and `04` after `01` passes.
+
+Leave `use_resolver` at `false` in every notebook. Setting it to `true` maps routing hosts back to the instance host, which hides missing records, so use it only to compare.
+
+#### Read the private endpoint IP
+
+Read the private endpoint IP, which the notebooks take as the expected_pe_ip widget and the A records point at. It needs PE_RG and PE_NAME in your shell, and the endpoint must exist. private_link.py verify also prints it as endpoint IP:
+
+```bash
+: "${PE_RG:?run source scripts/load-env.sh}" "${PE_NAME:?run source scripts/load-env.sh}"
+export PE_IP=$(az network nic show --ids "$(az network private-endpoint show --resource-group "$PE_RG" --name "$PE_NAME" --query 'networkInterfaces[0].id' -o tsv)" --query 'ipConfigurations[0].privateIPAddress' -o tsv)
+echo "$PE_IP"
+```
+
+#### Notebook 01: validate connectivity
 
 1. Open the workspace at `$WORKSPACE_URL`, then open the `neo4j-privatelink-pl` folder and the notebook `01_validate_connectivity`.
 2. In the compute dropdown at the top, attach your classic compute. It must show as running.
 3. Fill in the widgets at the top of the notebook.
-   - `expected_pe_ip`: the value of `$PE_IP`. Read it as in [Azure network](env-setup.md#azure-network-private-link-path) if it is not set. `private_link.py verify` also prints it as `endpoint IP`.
+   - `expected_pe_ip`: the value of `$PE_IP`.
    - `use_resolver`: `false`.
 4. Click **Run all**.
 
-[pl-notebooks/01_validate_connectivity.py](../pl-notebooks/01_validate_connectivity.py) checks four things in order:
+The notebook checks four things in order:
 
 1. The Aura host resolves to a private address. When `expected_pe_ip` is set, the answer must equal it. A public answer points to the zone link or the A record, not to an NCC rule.
 2. TCP reaches the Bolt port.
@@ -485,6 +506,24 @@ Run the notebooks in the workspace, not from the CLI:
 Passing means every cell finishes without an error. **The first run is expected to fail at check 3.** The routing-host records do not exist yet, and the notebook lists each host that needs one. Continue at [Add routing-host records](#add-routing-host-records).
 
 Databricks masks the word `neo4j` in cell output as `[REDACTED]`, because the `username` and `database` secrets hold it. A host such as `p-<aura-instance-id>-<suffix>.<orch>.[REDACTED].io` really ends in `.neo4j.io`.
+
+#### Notebook 02: Delta to Neo4j
+
+This notebook round-trips a Delta table. It expects a Unity Catalog catalog named `pldemo`. Create that catalog, or change `CATALOG` near the top of the notebook to a catalog you own.
+
+Set `use_resolver` to `false` and click **Run all**.
+
+#### Notebook 03: push and pull demo
+
+This notebook pushes 20 rows and pulls aggregates back.
+
+Set `use_resolver` to `false` and click **Run all**.
+
+#### Notebook 04: smoke test
+
+This notebook repeats the DNS and routing-host checks and adds a 100-row write and read-back.
+
+Set `expected_pe_ip` to the value of `$PE_IP` and `use_resolver` to `false`, then click **Run all**.
 
 ### Add routing-host records
 
@@ -544,17 +583,7 @@ Repeat the record commands for every routing host a client reports. For each hos
 
 Do not use a `p-*` record. An Azure private DNS wildcard must be the whole label `*`, so `p-*` matches nothing. A `*` record would point every host under that domain at your endpoint, so add one record per host instead.
 
-Whether you used the script or the manual commands, restart the cluster from the **Compute** page after you add the records so it drops cached DNS answers. Wait until it is running. Then run `01_validate_connectivity` again with the same widget values. It should pass.
-
-### Run the other notebooks
-
-Attach each one to the same cluster. Run them in this order after `01` passes:
-
-1. [pl-notebooks/04_smoke_test.py](../pl-notebooks/04_smoke_test.py) repeats the DNS and routing-host checks and adds a 100-row write and read-back. It has the same `expected_pe_ip` and `use_resolver` widgets.
-2. [pl-notebooks/03_push_pull_demo.py](../pl-notebooks/03_push_pull_demo.py) pushes 20 rows and pulls aggregates back. It has the `use_resolver` widget only.
-3. [pl-notebooks/02_delta_to_neo4j.py](../pl-notebooks/02_delta_to_neo4j.py) round-trips a Delta table. It expects a Unity Catalog catalog named `pldemo`. Create that catalog, or change `CATALOG` near the top of the notebook to a catalog you own.
-
-The notebooks map routing hosts back to the instance host only when you set the `use_resolver` widget to `true`. That workaround hides missing records, so use it only to compare.
+Whether you used the script or the manual commands, restart the cluster from the **Compute** page after you add the records so it drops cached DNS answers. Wait until it is running. Then run `01_validate_connectivity` again with the same widget values. It should pass. Run notebooks `02`, `03`, and `04` next, as in [Run the validation notebook](#run-the-validation-notebook).
 
 ### Close the public endpoint
 

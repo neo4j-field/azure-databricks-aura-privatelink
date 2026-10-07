@@ -1,10 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # PrivateLink Smoke Test: Databricks Serverless <-> Neo4j Aura
+# MAGIC # NCC Smoke Test: Databricks Serverless <-> Neo4j Aura
 # MAGIC
 # MAGIC End-to-end validation that data flows privately between this
 # MAGIC Azure Databricks Serverless workspace and the Aura instance named in the
-# MAGIC `neo4j` secret scope over Azure PrivateLink.
+# MAGIC `neo4j` secret scope over an NCC-managed private endpoint.
 # MAGIC
 # MAGIC **What this notebook does**
 # MAGIC 1. Loads Neo4j credentials from the `neo4j` secret scope
@@ -16,7 +16,8 @@
 # MAGIC 7. Cleans up the test data (best-effort)
 # MAGIC
 # MAGIC **Prerequisites**
-# MAGIC - Run the Terraform under `infra/terraform/` so the NCC + PE rule exist
+# MAGIC - Create the NCC + PE rule, with the Terraform under `infra/terraform/databricks-ncc/`
+# MAGIC   or by following `docs/setup-ncc-manual.md`
 # MAGIC - Approve the incoming PE request in the Aura console
 # MAGIC - Wait until the rule reads `ESTABLISHED` in the Databricks NCC view
 # MAGIC - Restart any running serverless compute, then attach this notebook to
@@ -71,7 +72,7 @@ print(f"Run tag  : {TEST_BATCH_TAG}")
 ip = socket.gethostbyname(EXPECTED_HOST)
 print(f"{EXPECTED_HOST} -> {ip}")
 assert ipaddress.ip_address(ip).is_private, (
-    f"DNS resolved to a public IP ({ip}). Private Link path is NOT active."
+    f"DNS resolved to a public IP ({ip}). The NCC private path is NOT active."
 )
 print("OK: resolves to a private address.")
 
@@ -258,4 +259,4 @@ print("Cleanup complete.")
 # COMMAND ----------
 
 driver.close()
-print("Smoke test PASSED: Databricks Serverless <-> Aura over PrivateLink is healthy.")
+print("Smoke test PASSED: Databricks Serverless <-> Aura over NCC is healthy.")

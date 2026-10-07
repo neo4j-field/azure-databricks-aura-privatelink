@@ -1,13 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Serverless + PrivateLink Push / Pull Demo
+# MAGIC # Serverless + NCC Push / Pull Demo
 # MAGIC
 # MAGIC A small, focused notebook that pushes a Spark DataFrame into Neo4j Aura and
 # MAGIC pulls aggregates back, with all traffic flowing privately over the
-# MAGIC NCC-managed PrivateLink path.
+# MAGIC NCC-managed private endpoint.
 # MAGIC
-# MAGIC Run after the NCC stack under `infra/terraform/` is applied and the rule
-# MAGIC reads `ESTABLISHED` in the Databricks account console.
+# MAGIC Run after the NCC is set up (`infra/terraform/databricks-ncc/` or
+# MAGIC `docs/setup-ncc-manual.md`) and the rule reads `ESTABLISHED` in the Databricks
+# MAGIC account console.
 # MAGIC
 # MAGIC **Secret scope `neo4j`** must hold `uri`, `username`, `password`.
 

@@ -1,27 +1,18 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Neo4j Aura PrivateLink Connectivity Validation
+# MAGIC # Neo4j Aura NCC Connectivity Validation
 # MAGIC
-# MAGIC End-to-end check that Azure Databricks reaches Neo4j Aura over Azure Private Link.
-# MAGIC It runs on serverless compute for the NCC path, or on a classic cluster in a
-# MAGIC VNet-injected workspace for the Private Link path.
+# MAGIC End-to-end check that Azure Databricks serverless compute reaches Neo4j Aura over a
+# MAGIC private endpoint managed by a Network Connectivity Configuration (NCC).
 # MAGIC
-# MAGIC **Prerequisites, NCC path (serverless)**
+# MAGIC **Prerequisites**
 # MAGIC - The NCC is attached to this workspace and its private endpoint rule reads `ESTABLISHED`.
 # MAGIC   See docs/setup-ncc-manual.md or docs/setup-ncc-terraform.md.
-# MAGIC
-# MAGIC **Prerequisites, Private Link path (classic cluster)**
-# MAGIC - The private endpoint is approved, and the `databases.neo4j.io` private DNS zone is
-# MAGIC   linked to the workspace VNet. See docs/setup-private-link-manual.md or
-# MAGIC   docs/setup-private-link-terraform.md.
-# MAGIC
-# MAGIC **Both paths**
 # MAGIC - The Databricks secret scope `neo4j` holds the keys `uri`, `username`, and `password`.
 # MAGIC   An optional `database` key overrides the default database `neo4j`.
 # MAGIC
 # MAGIC The driver in step 4 maps Aura routing hosts (`p-<aura-instance-id>-*.neo4j.io`) to the
-# MAGIC instance host, so this notebook passes without routing-host DNS entries. Clients that
-# MAGIC do not use such a resolver still need them.
+# MAGIC instance host, so this notebook passes without routing-host DNS entries.
 
 # COMMAND ----------
 
@@ -54,6 +45,7 @@ print(f"Database        : {NEO4J_DATABASE}")
 
 # COMMAND ----------
 
+import ipaddress
 import socket
 from urllib.parse import urlparse
 
@@ -61,17 +53,9 @@ host = urlparse(NEO4J_URI).hostname
 ip = socket.gethostbyname(host)
 print(f"{host} -> {ip}")
 
-is_private = (
-    ip.startswith("10.") or
-    ip.startswith("192.168.") or
-    (ip.startswith("172.") and 16 <= int(ip.split(".")[1]) <= 31)
-)
-
-assert is_private, (
-    f"DNS resolved to a public IP ({ip}). Private Link is NOT in use. "
-    "NCC path: check that the private endpoint rule includes domain_names and is "
-    "ESTABLISHED. Private Link path: check that the private DNS zone is linked to "
-    "the workspace VNet and holds an A record for the instance."
+assert ipaddress.ip_address(ip).is_private, (
+    f"DNS resolved to a public IP ({ip}). The private path is NOT in use. "
+    "Check that the NCC private endpoint rule includes domain_names and is ESTABLISHED."
 )
 print("OK: resolves to private address space.")
 
@@ -139,14 +123,5 @@ print(f"Connected successfully. Current node count: {node_count}")
 
 # COMMAND ----------
 
-# MAGIC %md ## 5. Verify driver routing info
-
-# COMMAND ----------
-
-driver.verify_connectivity()
-print("Driver verify_connectivity() OK.")
-
-# COMMAND ----------
-
 driver.close()
-print("Validation complete. Private Link path is working end-to-end.")
+print("Validation complete. NCC private path is working end-to-end.")

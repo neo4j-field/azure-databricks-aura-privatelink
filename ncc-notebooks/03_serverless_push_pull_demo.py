@@ -1,13 +1,14 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Serverless + PrivateLink Push / Pull Demo
+# MAGIC # Serverless + NCC Push / Pull Demo
 # MAGIC
 # MAGIC A small, focused notebook that pushes a Spark DataFrame into Neo4j Aura and
 # MAGIC pulls aggregates back, with all traffic flowing privately over the
-# MAGIC NCC-managed PrivateLink path.
+# MAGIC NCC-managed private endpoint.
 # MAGIC
-# MAGIC Run after the NCC stack under `infra/terraform/` is applied and the rule
-# MAGIC reads `ESTABLISHED` in the Databricks account console.
+# MAGIC Run after the NCC is set up (`infra/terraform/databricks-ncc/` or
+# MAGIC `docs/setup-ncc-manual.md`) and the rule reads `ESTABLISHED` in the Databricks
+# MAGIC account console.
 # MAGIC
 # MAGIC **Secret scope `neo4j`** must hold `uri`, `username`, `password`.
 
@@ -22,13 +23,21 @@
 
 # COMMAND ----------
 
+import re
+from urllib.parse import urlparse
+
 from neo4j import GraphDatabase
 from pyspark.sql import functions as F
 
 NEO4J_URI      = dbutils.secrets.get(scope="neo4j", key="uri")
 NEO4J_USER     = dbutils.secrets.get(scope="neo4j", key="username")
 NEO4J_PASSWORD = dbutils.secrets.get(scope="neo4j", key="password")
-NEO4J_DATABASE = "neo4j"
+SECRET_KEYS    = {s.key for s in dbutils.secrets.list("neo4j")}
+NEO4J_DATABASE = (
+    dbutils.secrets.get(scope="neo4j", key="database")
+    if "database" in SECRET_KEYS
+    else "neo4j"
+)
 
 DEMO_LABEL = "DemoCustomer"
 ROWS       = 20
@@ -57,11 +66,27 @@ display(push_df)
 # MAGIC
 # MAGIC 20 rows comfortably fits in one transaction, so we collect on the driver
 # MAGIC and write once. For larger sets, switch to `foreachPartition` with batches
-# MAGIC of 1k-10k rows (see `notebooks/02_delta_to_neo4j.py`).
+# MAGIC of 1k-10k rows (see `ncc-notebooks/02_delta_to_neo4j.py`).
 
 # COMMAND ----------
 
-driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+def make_resolver(uri):
+    # Aura VDC advertises p-<aura-instance-id>-*.neo4j.io routing hosts that do not resolve on
+    # Databricks serverless. Map them to the private Aura host that NCC resolves.
+    host = urlparse(uri).hostname
+    pattern = re.compile(rf"^p-{re.escape(host.split('.')[0])}-.*\.neo4j\.io$")
+
+    def resolver(address):
+        mapped_host = host if pattern.match(address.host) else address.host
+        return [(mapped_host, address.port)]
+
+    return resolver
+
+driver = GraphDatabase.driver(
+    NEO4J_URI,
+    auth=(NEO4J_USER, NEO4J_PASSWORD),
+    resolver=make_resolver(NEO4J_URI),
+)
 
 MERGE_CYPHER = f"""
 UNWIND $rows AS row

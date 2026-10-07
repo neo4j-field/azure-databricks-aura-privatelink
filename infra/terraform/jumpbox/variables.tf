@@ -36,7 +36,7 @@ variable "bastion_subnet_cidr" {
 }
 
 variable "pe_nic_ip" {
-  description = "Private IP of the Neo4j Aura Private Endpoint NIC. The jump box socat proxies forward here. Pass module.private_endpoint.private_endpoint_nic_ip."
+  description = "Private IP of the Neo4j Aura Private Endpoint NIC. The jump box socat proxies forward here. Inside the private endpoint stack, pass azurerm_private_endpoint.aura.private_service_connection[0].private_ip_address."
   type        = string
 }
 
@@ -71,7 +71,7 @@ variable "admin_username" {
 }
 
 variable "ssh_public_key" {
-  description = "SSH public key for the jump box VM admin user. The private key is used in the gcloud ssh step."
+  description = "SSH public key for the jump box VM admin user. Keep the matching private key to SSH to the VM."
   type        = string
 }
 

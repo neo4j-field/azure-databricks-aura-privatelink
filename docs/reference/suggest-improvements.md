@@ -10,8 +10,8 @@ proposed change, and how to build it if someone picks it up later.
 
 ### The problem
 
-Neo4j Aura VDC advertises Bolt *routing* hosts like `p-<dbid>-....neo4j.io` only after
-the first connection to `<dbid>.databases.neo4j.io`. Each of those routing hosts must
+Neo4j Aura VDC advertises Bolt *routing* hosts like `p-<aura-instance-id>-....neo4j.io` only after
+the first connection to `<aura-instance-id>.databases.neo4j.io`. Each of those routing hosts must
 also resolve through NCC-managed DNS, or the driver fails with
 `Cannot resolve address p-...neo4j.io:7687`.
 
@@ -27,7 +27,7 @@ host: one Terraform apply per hostname.
 Discover every routing host up front, so one extra apply covers them all.
 
 1. Add a small probe notebook or script, submitted the same way as the validation run in
-   `run_validation()`. It connects to `<dbid>.databases.neo4j.io`, reads the routing
+   `run_validation()`. It connects to `<aura-instance-id>.databases.neo4j.io`, reads the routing
    table, and returns every `p-*.neo4j.io` host.
 2. Run the probe as soon as the NCC rule reaches `ESTABLISHED`. Merge the results into a
    single suggested `aura_extra_domain_names` value, deduped against hosts already in

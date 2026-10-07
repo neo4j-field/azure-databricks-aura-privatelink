@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" role="img">
+  <title>How a Bolt connection follows the routing table over an NCC private endpoint</title>
+  <defs><marker id="arrow-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8A8A8A"/></marker><marker id="arrow-dark" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5C6470"/></marker><marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C42B12"/></marker><marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2E6DB4"/></marker><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#1a1a1a" flood-opacity="0.10"/></filter></defs>
+  <rect x="10" y="10" width="1180" height="680" rx="16" fill="#FFFFFF" stroke="#E7E4DB" stroke-width="1" filter="url(#sh)"/>
+  <rect x="1100" y="34" width="10" height="10" rx="2" fill="#2E6DB4"/><text x="1118" y="43" font-size="12" fill="#16233A">Neo4j</text><rect x="993" y="34" width="10" height="10" rx="2" fill="#E1503A"/><text x="1011" y="43" font-size="12" fill="#16233A">Databricks</text>
+
+  <!-- phase bands -->
+  <rect x="30" y="124" width="1140" height="222" rx="12" fill="#FAF9F5" stroke="#E7E4DB" stroke-width="1"/>
+  <text x="44" y="141" font-size="10" fill="#5C6470" font-weight="bold" letter-spacing="0.6">FIRST CONNECTION</text>
+  <rect x="30" y="356" width="1140" height="180" rx="12" fill="#FAF9F5" stroke="#E7E4DB" stroke-width="1"/>
+  <text x="44" y="373" font-size="10" fill="#5C6470" font-weight="bold" letter-spacing="0.6">NEXT CONNECTIONS FOLLOW THE ROUTING TABLE</text>
+  <rect x="30" y="546" width="1140" height="130" rx="12" fill="#FDF2EF" stroke="#E1503A" stroke-width="1.2" stroke-dasharray="6,4"/>
+  <text x="44" y="563" font-size="10" fill="#C42B12" font-weight="bold" letter-spacing="0.6">A CLIENT WITH NO RESOLVER, AND THE ROUTING HOST MISSING FROM domain_names</text>
+
+  <!-- lifelines -->
+  <path d="M150,120 V676" stroke="#C9C6BC" stroke-width="1.2" stroke-dasharray="4,4"/>
+  <path d="M480,120 V676" stroke="#C9C6BC" stroke-width="1.2" stroke-dasharray="4,4"/>
+  <path d="M780,120 V676" stroke="#C9C6BC" stroke-width="1.2" stroke-dasharray="4,4"/>
+  <path d="M1050,120 V676" stroke="#C9C6BC" stroke-width="1.2" stroke-dasharray="4,4"/>
+
+  <!-- participants -->
+  <rect x="30" y="64" width="240" height="56" rx="10" fill="#FDF2EF" stroke="#E1503A" stroke-width="1.5"/>
+  <text x="150" y="88" font-size="13" fill="#C42B12" text-anchor="middle" font-weight="bold">Neo4j driver</text>
+  <text x="150" y="106" font-size="10" fill="#A8776C" text-anchor="middle">serverless notebook or job</text>
+  <rect x="360" y="64" width="240" height="56" rx="10" fill="#FDF2EF" stroke="#E1503A" stroke-width="1.5"/>
+  <text x="480" y="88" font-size="13" fill="#C42B12" text-anchor="middle" font-weight="bold">NCC DNS + private endpoint</text>
+  <text x="480" y="106" font-size="10" fill="#A8776C" text-anchor="middle">managed by Databricks</text>
+  <rect x="660" y="64" width="240" height="56" rx="10" fill="#EAF1FA" stroke="#2E6DB4" stroke-width="1.6"/>
+  <text x="780" y="88" font-size="13" fill="#1F4F8A" text-anchor="middle" font-weight="bold">Aura Private Link + ingress</text>
+  <text x="780" y="106" font-size="10" fill="#5E7FA8" text-anchor="middle">managed by Neo4j</text>
+  <rect x="930" y="64" width="240" height="56" rx="10" fill="#EAF1FA" stroke="#2E6DB4" stroke-width="1.6"/>
+  <text x="1050" y="88" font-size="13" fill="#1F4F8A" text-anchor="middle" font-weight="bold">Aura instance</text>
+  <text x="1050" y="106" font-size="10" fill="#5E7FA8" text-anchor="middle">VDC cluster</text>
+
+  <!-- 1: DNS lookup of the instance host -->
+  <circle cx="172" cy="166" r="9" fill="#16233A"/><text x="172" y="170" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">1</text>
+  <text x="190" y="170" font-size="11" fill="#16233A">Look up &lt;aura-id&gt;.databases.neo4j.io</text>
+  <path d="M150,176 H477" fill="none" stroke="#C42B12" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <text x="190" y="200" font-size="11" fill="#C42B12">Private IP, because the host is in domain_names</text>
+  <path d="M483,206 H153" fill="none" stroke="#C42B12" stroke-width="1.6" stroke-dasharray="5,3" marker-end="url(#arrow-red)"/>
+
+  <!-- 2: Bolt through the private endpoint -->
+  <circle cx="172" cy="234" r="9" fill="#16233A"/><text x="172" y="238" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">2</text>
+  <text x="190" y="238" font-size="11" fill="#16233A">Bolt over TLS, SNI = &lt;aura-id&gt;.databases.neo4j.io</text>
+  <text x="190" y="262" font-size="10" fill="#5C6470">travels through the NCC private endpoint</text>
+  <path d="M150,244 H777" fill="none" stroke="#5C6470" stroke-width="2" marker-end="url(#arrow-dark)"/>
+  <circle cx="480" cy="244" r="4.5" fill="#E1503A"/>
+
+  <!-- 3: ingress routes by host name -->
+  <circle cx="802" cy="274" r="9" fill="#16233A"/><text x="802" y="278" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">3</text>
+  <text x="820" y="278" font-size="11" fill="#16233A">Routes by host name</text>
+  <path d="M780,284 H1047" fill="none" stroke="#2E6DB4" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+
+  <!-- 4: routing table comes back -->
+  <circle cx="172" cy="316" r="9" fill="#16233A"/><text x="172" y="320" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">4</text>
+  <text x="190" y="320" font-size="11" fill="#1F4F8A">Routing table: readers, writers and routers, such as p-&lt;aura-id&gt;-&lt;suffix&gt;.&lt;orch&gt;.neo4j.io</text>
+  <path d="M1050,330 H153" fill="none" stroke="#2E6DB4" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrow-blue)"/>
+
+  <!-- 5: resolver note -->
+  <rect x="60" y="384" width="600" height="44" rx="10" fill="#FDF2EF" stroke="#E1503A" stroke-width="1.5"/>
+  <circle cx="82" cy="406" r="9" fill="#16233A"/><text x="82" y="410" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">5</text>
+  <text x="100" y="403" font-size="11" fill="#C42B12" font-weight="bold">Driver resolver rewrites the routing host</text>
+  <text x="100" y="418" font-size="10" fill="#A8776C">p-&lt;aura-id&gt;-*.neo4j.io becomes &lt;aura-id&gt;.databases.neo4j.io</text>
+
+  <!-- 6: new connections reuse the private path -->
+  <circle cx="172" cy="456" r="9" fill="#16233A"/><text x="172" y="460" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">6</text>
+  <text x="190" y="460" font-size="11" fill="#16233A">New Bolt connections use the same private endpoint, SNI = &lt;aura-id&gt;.databases.neo4j.io</text>
+  <path d="M150,470 H777" fill="none" stroke="#5C6470" stroke-width="2" marker-end="url(#arrow-dark)"/>
+  <circle cx="480" cy="470" r="4.5" fill="#E1503A"/>
+
+  <!-- 7: query runs -->
+  <circle cx="802" cy="504" r="9" fill="#16233A"/><text x="802" y="508" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">7</text>
+  <text x="820" y="508" font-size="11" fill="#16233A">Aura serves the query</text>
+  <path d="M780,516 H1047" fill="none" stroke="#2E6DB4" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+
+  <!-- 8: failure case -->
+  <circle cx="172" cy="590" r="9" fill="#C42B12"/><text x="172" y="594" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">8</text>
+  <text x="190" y="594" font-size="10.5" fill="#16233A">Look up p-&lt;aura-id&gt;-&lt;suffix&gt;.&lt;orch&gt;.neo4j.io</text>
+  <path d="M150,602 H477" fill="none" stroke="#C42B12" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+  <text x="190" y="624" font-size="10.5" fill="#C42B12">No private answer: Cannot resolve address</text>
+  <path d="M483,630 H153" fill="none" stroke="#C42B12" stroke-width="1.6" stroke-dasharray="5,3" marker-end="url(#arrow-red)"/>
+  <text x="520" y="606" font-size="11" fill="#C42B12" font-weight="bold">Fix: add the host to domain_names, or install a resolver.</text>
+  <text x="520" y="624" font-size="10.5" fill="#A8776C">Wildcards are not allowed in domain_names. Each name is exact.</text>
+</svg>

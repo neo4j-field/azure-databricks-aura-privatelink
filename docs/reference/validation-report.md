@@ -33,10 +33,10 @@ Reconciliation of the original draft guide "Neo4j Aura PrivateLink + Azure Datab
 
 **Missing in the draft:**
 
-1. **Target Azure Subscription ID registration** in Aura Network Access config. For Databricks Serverless NCC, the private endpoint request comes from a Databricks-managed Azure subscription; without that subscription on Aura's allow-list, the PE request never surfaces for approval.
+1. **Target Azure Subscription ID registration** in the Aura network access configuration. For Databricks Serverless NCC, the private endpoint request comes from a Databricks-managed Azure subscription; without that subscription on Aura's allow-list, the PE request never surfaces for approval.
 2. **Region-scoped, not instance-scoped**: enabling Private Link applies to all instances in the region under the tenant.
 3. **Private URI vs Connection URI**: each instance gets a separate Private URI after Private Link is enabled.
-4. **Exact console path**: Security → Network Access → Network Access → New network access configuration.
+4. **Exact console path**: Project settings → Security & Networking → Private endpoints → New network access configuration. This path is maintained in [Aura console Step 2](../shared/aura-console-steps.md#step-2-enable-private-link-in-aura-network-access-configuration).
 
 ### Step 2: Databricks Workspace
 
@@ -84,7 +84,7 @@ Aura falls under the Databricks "Resources behind a Standard Load Balancer" supp
 - **The Private Endpoint stack has two valid DNS topologies**, and the draft assumes only the first:
   - *Self-managed (single VNet):* the consumer creates a `databases.neo4j.io` private DNS zone, links it to the VNet, and adds the Aura A record. This is the `azure-private-endpoint` stack's default (`manage_private_dns = true`).
   - *Central / hub-and-spoke:* a shared hub VNet owns the private DNS zones (frequently behind Azure DNS Private Resolver) and spokes consume them via peering and zone links. This is Microsoft's recommended enterprise pattern (see [Private Link and DNS integration at scale](https://learn.microsoft.com/en-us/azure/cloud-adoption-framework/ready/azure-best-practices/private-link-and-dns-integration-at-scale)). Here the stack must **not** create its own zone. A duplicate zone in a spoke causes split-brain resolution, and many tenants block spoke-level zone creation via Azure Policy. Set `manage_private_dns = false` so only the Private Endpoint is created, then add the A record (pointing at the PE NIC IP) and the `p-*` routing-host records in the hub zone.
-  - The `p-<dbid>-...neo4j.io` routing hostnames (see item 4 below) must also be present in whichever zone owns the hostname, in both topologies.
+  - The `p-<aura-instance-id>-...neo4j.io` routing hostnames (see item 4 below) must also be present in whichever zone owns the hostname, in both topologies.
 
 ### Step 7: Validation
 
@@ -103,4 +103,4 @@ Aura falls under the Databricks "Resources behind a Standard Load Balancer" supp
 1. **Azure Databricks networking costs**: serverless egress to customer resources is billed.
 2. **June 9, 2026 deadline** for Azure storage allowlists to migrate to Network Security Perimeter with the `AzureDatabricksServerless` service tag.
 3. **Production retry/idempotency example**: the draft recommends these but the code sample does not show them.
-4. **Bolt routing on VDC clusters**: routing URIs returned in cluster topology can include `p-*.neo4j.io` hostnames. These must be added to NCC `domain_names` alongside `<dbid>.databases.neo4j.io`; otherwise the first DNS/TCP checks pass but the driver fails with `Cannot resolve address p-...neo4j.io:7687`.
+4. **Bolt routing on VDC clusters**: routing URIs returned in cluster topology can include `p-*.neo4j.io` hostnames. These must be added to NCC `domain_names` alongside `<aura-instance-id>.databases.neo4j.io`; otherwise the first DNS/TCP checks pass but the driver fails with `Cannot resolve address p-...neo4j.io:7687`.

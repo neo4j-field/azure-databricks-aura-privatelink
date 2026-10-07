@@ -5,7 +5,7 @@
   <rect x="1000" y="34" width="10" height="10" rx="2" fill="#2E6DB4"/><text x="1018" y="43" font-size="12" fill="#16233A">Neo4j</text><rect x="854" y="34" width="10" height="10" rx="2" fill="#8A8A8A"/><text x="872" y="43" font-size="12" fill="#16233A">Azure / customer</text>
   <rect x="100" y="64" width="900" height="60" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
   <text x="550.0" y="91.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Your laptop</text>
-  <text x="550.0" y="111.5" font-size="10" fill="#5C6470" text-anchor="middle">public DNS gives 52.x.x.x for &lt;dbid&gt;.databases.neo4j.io, so Aura refuses the connection</text>
+  <text x="550.0" y="111.5" font-size="10" fill="#5C6470" text-anchor="middle">public DNS gives 52.x.x.x for &lt;aura-instance-id&gt;.databases.neo4j.io, so Aura refuses the connection</text>
   <rect x="100" y="190" width="380" height="212" rx="14" fill="none" stroke="#8A8A8A" stroke-width="1.2" stroke-dasharray="6,4"/>
   <text x="114" y="184" font-size="10" fill="#5C6470" font-weight="bold" letter-spacing="0.6">OPTION A: AZURE BASTION</text>
   <rect x="620" y="190" width="380" height="212" rx="14" fill="none" stroke="#8A8A8A" stroke-width="1.2" stroke-dasharray="6,4"/>
@@ -33,7 +33,7 @@
   <path d="M810,395 V415 Q810,427 798,427 H392 Q380,427 380,439 V449" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
   <rect x="200" y="452" width="240" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
   <text x="320.0" y="477.0" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Private DNS zone</text>
-  <text x="320.0" y="497.0" font-size="10" fill="#5C6470" text-anchor="middle">&lt;dbid&gt;.databases.neo4j.io</text>
+  <text x="320.0" y="497.0" font-size="10" fill="#5C6470" text-anchor="middle">&lt;aura-instance-id&gt;.databases.neo4j.io</text>
   <text x="320.0" y="512.0" font-size="10" fill="#5C6470" text-anchor="middle">resolves to 10.x.x.x</text>
   <path d="M443,487 H497" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
   <rect x="500" y="452" width="220" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>

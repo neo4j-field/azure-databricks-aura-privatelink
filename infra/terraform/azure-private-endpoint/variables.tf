@@ -1,5 +1,5 @@
 variable "azure_subscription_id" {
-  description = "Azure subscription where the private endpoint and DNS zone will live. Must be registered in the Aura Network Access config before applying."
+  description = "Azure subscription where the private endpoint and DNS zone will live. Must be registered in the Aura network access configuration before applying."
   type        = string
 }
 

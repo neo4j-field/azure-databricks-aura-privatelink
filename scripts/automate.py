@@ -9,8 +9,7 @@
 """
 automate.py - orchestrate the Databricks Serverless + Neo4j Aura Private Link setup.
 
-This is the Phase 1 orchestrator described in automate-v2.md. It drives the
-`databricks-ncc` Terraform stack and fills the runtime gaps that Terraform and
+It drives the `databricks-ncc` Terraform stack and fills the runtime gaps that Terraform and
 the standalone helper scripts do not cover: polling the NCC private endpoint
 rule to ESTABLISHED, restarting running SQL warehouses so they pick up
 NCC-managed DNS, populating the `neo4j` secret scope, and running a validation
@@ -26,20 +25,21 @@ Auth uses the Databricks SDK with CLI-profile OAuth:
   - --account-profile targets https://accounts.azuredatabricks.net (NCC rule status)
   - --workspace-profile targets the workspace URL (secrets, jobs, warehouses)
 
-Configure the account profile once (Phase 1 prerequisite):
-  databricks auth login --host https://accounts.azuredatabricks.net --account-id <account-id>
+Configure the account profile once:
+  databricks auth login --host https://accounts.azuredatabricks.net --account-id <account-id> --profile <name>
 
 Aura credentials come from the repo-root .env (loaded at startup via python-dotenv):
   NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, and optional NEO4J_DATABASE (default neo4j).
+The workspace profile defaults to WORKSPACE_PROFILE from the same file.
 Real environment variables, if set, take precedence over the .env file.
 
 Usage:
   cd <repo-root>
-  uv run scripts/automate.py run --account-profile <name> [--workspace-profile azure-rk-knight]
+  uv run scripts/automate.py run --account-profile <name> [--workspace-profile <name>]
 
 `run` flags:
   --no-apply                Skip `terraform apply`; only read `terraform output -json`.
-  --notebook PATH           Validation notebook (default: notebooks/01_validate_connectivity.py).
+  --notebook PATH           Validation notebook (default: ncc-notebooks/01_validate_connectivity.py).
   --poll-timeout N          Seconds to wait for the rule to reach ESTABLISHED (default: 600).
   --poll-interval N         Seconds between rule status polls (default: 15).
   --run-timeout N           Minutes to wait for the validation run to finish (default: 30).
@@ -47,7 +47,7 @@ Usage:
   --reset-secret-scope      Delete the `neo4j` secret scope before recreating it.
 
 Teardown is a manual process (a placeholder-NCC swap that has no clean automation
-plus two Aura-console actions with no API); see the Teardown section in README.md.
+plus two Aura-console actions with no API); see docs/operations/teardown.md.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TERRAFORM_DIR = REPO_ROOT / "infra" / "terraform" / "databricks-ncc"
-DEFAULT_NOTEBOOK = REPO_ROOT / "notebooks" / "01_validate_connectivity.py"
+DEFAULT_NOTEBOOK = REPO_ROOT / "ncc-notebooks" / "01_validate_connectivity.py"
 WORKSPACE_NOTEBOOK_DIR = "/Shared/aura-privatelink"
 
 SECRET_SCOPE = "neo4j"
@@ -86,7 +86,7 @@ SUBSCRIPTION_PATH_RE = re.compile(
     r"/subscriptions/([0-9a-fA-F-]{36})/resourceGroups/(prod-[\w-]+)"
 )
 
-# Neo4j Aura VDC advertises Bolt routing hosts like p-<dbid>-....neo4j.io after
+# Neo4j Aura VDC advertises Bolt routing hosts like p-<aura-instance-id>-....neo4j.io after
 # the first connection. If those do not resolve through NCC DNS the driver
 # raises "Cannot resolve address p-...neo4j.io:7687".
 ROUTING_HOST_RE = re.compile(
@@ -94,6 +94,9 @@ ROUTING_HOST_RE = re.compile(
 )
 
 # NCC private endpoint rule connection states.
+# Single source of truth for the Aura console location used in printed instructions.
+AURA_PRIVATE_ENDPOINTS_PATH = "Project settings -> Security & Networking -> Private endpoints"
+
 STATE_ESTABLISHED = "ESTABLISHED"
 STATE_PENDING = "PENDING"
 STATE_TERMINAL_BAD = {"REJECTED", "DISCONNECTED", "EXPIRED", "CREATE_FAILED"}
@@ -207,7 +210,7 @@ def _print_allowlist_instruction(error_text: str) -> None:
         )
     print(
         "To fix:\n"
-        "  1. Open the Aura console -> your instance -> Network Access.\n"
+        f"  1. Open the Aura console -> {AURA_PRIVATE_ENDPOINTS_PATH}.\n"
         "  2. Add the subscription ID above to 'Target Azure Subscription IDs'.\n"
         "  3. Re-run this command. Databricks may retry from more than one managed\n"
         "     subscription per region, so this can iterate - add each ID it surfaces.\n"
@@ -261,8 +264,9 @@ def poll_rule(account_client, outputs: TerraformOutputs, timeout: int, interval:
         if state in STATE_TERMINAL_BAD:
             raise SetupError(
                 f"Rule is {state}. Recreate it with:\n"
-                "  terraform taint databricks_mws_ncc_private_endpoint_rule.aura\n"
-                "  terraform apply"
+                f"  terraform -chdir={TERRAFORM_DIR} taint "
+                "databricks_mws_ncc_private_endpoint_rule.aura\n"
+                f"  terraform -chdir={TERRAFORM_DIR} apply"
             )
 
         if state == STATE_PENDING:
@@ -287,7 +291,7 @@ def poll_rule(account_client, outputs: TerraformOutputs, timeout: int, interval:
 def _print_approval_instruction() -> None:
     print(
         "\n  ACTION REQUIRED - approve the private endpoint in the Aura console:\n"
-        "    Security -> Network Access -> Pending approvals -> Approve.\n"
+        f"    {AURA_PRIVATE_ENDPOINTS_PATH} -> approve the pending request.\n"
         "  Polling will continue in case you have already approved it...\n"
     )
 
@@ -481,7 +485,7 @@ def make_account_client(profile: str | None):
             "An account-console profile is required to poll the NCC rule.\n"
             "Configure one, then pass --account-profile <name>:\n"
             "  databricks auth login --host https://accounts.azuredatabricks.net "
-            "--account-id <account-id>"
+            "--account-id <account-id> --profile <name>"
         )
     return AccountClient(profile=profile)
 
@@ -532,12 +536,16 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="Drive the setup to a passing validation run (re-entrant).")
     run.add_argument(
         "--account-profile",
+        required=True,
         help="Databricks CLI profile for the account console (accounts.azuredatabricks.net).",
     )
+    workspace_profile = os.environ.get("WORKSPACE_PROFILE")
     run.add_argument(
         "--workspace-profile",
-        default="azure-rk-knight",
-        help="Databricks CLI profile for the target workspace (default: azure-rk-knight).",
+        default=workspace_profile,
+        required=not workspace_profile,
+        help="Databricks CLI profile for the target workspace "
+        "(default: WORKSPACE_PROFILE from .env).",
     )
     run.add_argument(
         "--no-apply",

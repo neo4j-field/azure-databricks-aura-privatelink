@@ -87,11 +87,13 @@ output "next_steps" {
 
     Next:
     1. Approve the incoming endpoint request in the Aura console
-       (Security -> Network Access -> Pending approvals).
-    2. Wait until the rule reads ESTABLISHED in the Databricks NCC view
-       (refresh the account console; can take a few minutes).
-    3. Restart any running serverless compute (SQL warehouses, running jobs).
-    4. Run notebooks/03_smoke_test.py from your workspace
+       (see docs/shared/aura-console-steps.md, Step 4).
+    2. Wait until the rule reads ESTABLISHED in the Databricks NCC view.
+       Refresh the account console. It can take a few minutes.
+    3. Wait 10 minutes after the attach, then restart any running serverless
+       compute, such as SQL warehouses and running jobs.
+    4. Run ncc-notebooks/01_validate_connectivity.py on serverless compute
        to validate the private path end-to-end.
+       See docs/setup-ncc-terraform.md, or run scripts/automate.py.
   EOT
 }

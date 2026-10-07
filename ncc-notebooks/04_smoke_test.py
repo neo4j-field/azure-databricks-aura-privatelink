@@ -1,10 +1,10 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # PrivateLink Smoke Test: Databricks Serverless <-> Neo4j Aura
+# MAGIC # NCC Smoke Test: Databricks Serverless <-> Neo4j Aura
 # MAGIC
 # MAGIC End-to-end validation that data flows privately between this
 # MAGIC Azure Databricks Serverless workspace and the Aura instance named in the
-# MAGIC `neo4j` secret scope over Azure PrivateLink.
+# MAGIC `neo4j` secret scope over an NCC-managed private endpoint.
 # MAGIC
 # MAGIC **What this notebook does**
 # MAGIC 1. Loads Neo4j credentials from the `neo4j` secret scope
@@ -16,7 +16,8 @@
 # MAGIC 7. Cleans up the test data (best-effort)
 # MAGIC
 # MAGIC **Prerequisites**
-# MAGIC - Run the Terraform under `infra/terraform/` so the NCC + PE rule exist
+# MAGIC - Create the NCC + PE rule, with the Terraform under `infra/terraform/databricks-ncc/`
+# MAGIC   or by following `docs/setup-ncc-manual.md`
 # MAGIC - Approve the incoming PE request in the Aura console
 # MAGIC - Wait until the rule reads `ESTABLISHED` in the Databricks NCC view
 # MAGIC - Restart any running serverless compute, then attach this notebook to
@@ -42,7 +43,12 @@ from urllib.parse import urlparse
 NEO4J_URI      = dbutils.secrets.get(scope="neo4j", key="uri")
 NEO4J_USER     = dbutils.secrets.get(scope="neo4j", key="username")
 NEO4J_PASSWORD = dbutils.secrets.get(scope="neo4j", key="password")
-NEO4J_DATABASE = "neo4j"
+SECRET_KEYS    = {s.key for s in dbutils.secrets.list("neo4j")}
+NEO4J_DATABASE = (
+    dbutils.secrets.get(scope="neo4j", key="database")
+    if "database" in SECRET_KEYS
+    else "neo4j"
+)
 
 EXPECTED_HOST   = urlparse(NEO4J_URI).hostname
 TEST_LABEL      = "DbxSmokeCustomer"
@@ -59,14 +65,14 @@ print(f"Run tag  : {TEST_BATCH_TAG}")
 # MAGIC %md ## 2. DNS must resolve to a private IP
 # MAGIC
 # MAGIC If this fails, the NCC private endpoint rule is missing the `domain_names`
-# MAGIC field or the rule is not yet `ESTABLISHED`. See `docs/troubleshooting.md`.
+# MAGIC field or the rule is not yet `ESTABLISHED`. See `docs/operations/troubleshooting.md`.
 
 # COMMAND ----------
 
 ip = socket.gethostbyname(EXPECTED_HOST)
 print(f"{EXPECTED_HOST} -> {ip}")
 assert ipaddress.ip_address(ip).is_private, (
-    f"DNS resolved to a public IP ({ip}). Private Link path is NOT active."
+    f"DNS resolved to a public IP ({ip}). The NCC private path is NOT active."
 )
 print("OK: resolves to a private address.")
 
@@ -96,8 +102,8 @@ from tenacity import (
     wait_exponential,
 )
 
-# Aura VDC advertises routing hosts shaped like p-<dbid>-<suffix>.<orch>.neo4j.io;
-# the dbid is the first label of the connection host.
+# Aura VDC advertises routing hosts shaped like p-<aura-instance-id>-<suffix>.<orch>.neo4j.io;
+# the instance id is the first label of the connection host.
 dbid = EXPECTED_HOST.split(".")[0]
 ROUTING_HOST_PATTERN = re.compile(rf"^p-{re.escape(dbid)}-.*\.neo4j\.io$")
 
@@ -161,29 +167,35 @@ SET c.name       = row.name,
     c.updated_at = datetime()
 """
 
-@retry(
-    stop=stop_after_attempt(5),
-    wait=wait_exponential(multiplier=1, min=1, max=16),
-    retry=retry_if_exception_type((ServiceUnavailable, TransientError)),
-    reraise=True,
-)
-def write_batch(rows):
-    with driver.session(database=NEO4J_DATABASE) as session:
-        session.execute_write(lambda tx: tx.run(MERGE_CYPHER, rows=rows).consume())
-
 def write_partition(partition_iter):
-    batch = []
-    for row in partition_iter:
-        d = row.asDict()
-        # Cast timestamp to ISO string so Cypher receives a datetime-compatible value.
-        d["signup_ts"] = d["signup_ts"].isoformat() if d["signup_ts"] is not None else None
-        batch.append(d)
-        if len(batch) >= BATCH_SIZE:
-            write_batch(batch)
-            batch = []
-    if batch:
-        write_batch(batch)
-    return iter([])
+    # Runs on the executors: open a driver per partition and build the retry here,
+    # because the driver and tenacity state hold locks that cannot be pickled.
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=16),
+        retry=retry_if_exception_type((ServiceUnavailable, TransientError)),
+        reraise=True,
+    )
+    def write_batch(conn, rows):
+        with conn.session(database=NEO4J_DATABASE) as session:
+            session.execute_write(lambda tx: tx.run(MERGE_CYPHER, rows=rows).consume())
+
+    with GraphDatabase.driver(
+        NEO4J_URI,
+        auth=(NEO4J_USER, NEO4J_PASSWORD),
+        resolver=aura_private_resolver,
+    ) as conn:
+        batch = []
+        for row in partition_iter:
+            d = row.asDict()
+            # Cast timestamp to ISO string so Cypher receives a datetime-compatible value.
+            d["signup_ts"] = d["signup_ts"].isoformat() if d["signup_ts"] is not None else None
+            batch.append(d)
+            if len(batch) >= BATCH_SIZE:
+                write_batch(conn, batch)
+                batch = []
+        if batch:
+            write_batch(conn, batch)
 
 sample_df.foreachPartition(write_partition)
 print("Write phase complete.")
@@ -247,4 +259,4 @@ print("Cleanup complete.")
 # COMMAND ----------
 
 driver.close()
-print("Smoke test PASSED: Databricks Serverless <-> Aura over PrivateLink is healthy.")
+print("Smoke test PASSED: Databricks Serverless <-> Aura over NCC is healthy.")

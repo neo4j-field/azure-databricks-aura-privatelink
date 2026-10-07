@@ -145,7 +145,7 @@ def cmd_env(args: argparse.Namespace) -> int:
         "--query", "alias",
     )  # fmt: skip
     exports = {
-        "RG": rg,
+        "PE_RG": rg,
         "VNET": CONSUMER_VNET,
         "VNET_RG": rg,
         "PE_SUBNET": PE_SUBNET,

@@ -25,8 +25,8 @@ subnet for it. `up` leaves any existing subnet alone.
 Settings come from .env, the same file private_link.py reads:
 
   VNET             VNet to inject into (required)
-  VNET_RG          its resource group (defaults to RG)
-  RG               resource group for the workspace (defaults to VNET_RG)
+  VNET_RG          its resource group (defaults to PE_RG)
+  WS_RG            resource group for the workspace (defaults to VNET_RG)
   WORKSPACE_NAME   workspace to create (default dbx-aura-pl-test)
 
 Commands (both re-entrant, both take --dry-run):
@@ -82,13 +82,13 @@ def load_settings(args: argparse.Namespace) -> Settings:
     vnet = config("VNET")
     if not vnet:
         raise SystemExit("error: VNET is not set. Set VNET and VNET_RG in .env.")
-    vnet_rg = config("VNET_RG") or config("RG")
+    vnet_rg = config("VNET_RG") or config("PE_RG")
     if not vnet_rg:
         raise SystemExit("error: VNET_RG is not set. Set it in .env.")
     return Settings(
         vnet=vnet,
         vnet_resource_group=vnet_rg,
-        resource_group=config("RG") or vnet_rg,
+        resource_group=config("WS_RG") or vnet_rg,
         workspace=config("WORKSPACE_NAME") or DEFAULT_WORKSPACE,
         host_cidr=args.host_cidr,
         container_cidr=args.container_cidr,

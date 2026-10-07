@@ -33,12 +33,15 @@ Both options start with [Before you start](#before-you-start) and finish with [D
 ## Contents
 
 - [Before you start](#before-you-start)
+  - [Aura and Azure prerequisites](#aura-and-azure-prerequisites)
+  - [Set up your environment](#set-up-your-environment)
+  - [Extra steps for the manual setup](#extra-steps-for-the-manual-setup)
+  - [Classic Databricks workspaces](#classic-databricks-workspaces)
 - [Option A: Run the script](#option-a-run-the-script)
 - [Option B: Run the commands yourself](#option-b-run-the-commands-yourself)
 - [Recreate a rejected or disconnected endpoint](#recreate-a-rejected-or-disconnected-endpoint)
 - [Databricks setup and validation](#databricks-setup-and-validation)
   - [Check the Azure side](#check-the-azure-side)
-  - [Collect your values](#collect-your-values)
   - [Create the Neo4j secret scope](#create-the-neo4j-secret-scope)
   - [Upload the notebooks](#upload-the-notebooks)
   - [Create a classic cluster](#create-a-classic-cluster)
@@ -51,77 +54,66 @@ Both options start with [Before you start](#before-you-start) and finish with [D
 
 ## Before you start
 
-You need the Aura values from [Aura console Steps 1 and 2](shared/aura-console-steps.md#step-1-provision-neo4j-aura-vdc-on-azure). You also need an existing VNet and a subnet that will host the endpoint NIC. The subnet must allow private endpoints, which is the default for modern subnets.
+### Aura and Azure prerequisites
 
-Your own Azure subscription ID must be in the Aura network access configuration under **Target Azure Subscription IDs**. Without it, the connection request never appears in Aura. Use your own subscription here, not a Databricks-managed one.
+- **Aura values:** Get them from [Aura console Steps 1 and 2](shared/aura-console-steps.md#step-1-provision-neo4j-aura-vdc-on-azure).
+- **Network:** You need an existing VNet and a subnet for the endpoint NIC. The subnet must allow private endpoints, which is the default for modern subnets.
+- **Aura allow list:** Your own Azure subscription ID must be under **Target Azure Subscription IDs** in the Aura network access configuration.
+  - Without it, the connection request never appears in Aura.
+  - Use your own subscription here, not a Databricks-managed one.
+- **Azure sign-in:** Sign in as a user who can create private endpoints and private DNS zones in the target resource group, as in [Sign in first](env-setup.md#sign-in-first).
 
-Sign in to Azure as a user who can create private endpoints and private DNS zones in the target resource group:
+### Set up your environment
 
-```bash
-az login --tenant "<tenant-id>"
-az account set --subscription "<subscription-id>"
-```
+Both options use the same values.
 
-Both options use the same values. The script reads them only from the repo-root `.env` file. It has no flags for them and ignores exported shell variables. Copy `env.sample` to `.env` if you have not yet. [Environment setup](env-setup.md) says where to find each value. Add:
+1. Copy `env.sample` to `.env` if you have not yet.
+2. Fill in the values. [Environment setup](env-setup.md) says where to find each one, and [Which values your path needs](env-setup.md#which-values-your-path-needs) lists the ones for this path.
+3. For Option B, load the file into your shell. Run it again after you edit `.env`:
 
-```bash
-RG="<resource-group>"                     # holds the endpoint and the DNS zone
-VNET="<vnet-name>"
-VNET_RG="<vnet-resource-group>"           # use the same value as RG if they match
-PE_SUBNET="<subnet-name>"
-PE_NAME="pe-<aura-instance-id>-<region>"
-AURA_PLS_ALIAS="production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice"
-AURA_INSTANCE_ID="<aura-instance-id>"     # the label only, for example abcd1234
-REQUEST_MESSAGE="Neo4j Aura Private Link from <team> / <subscription nickname>"
-```
+   ```bash
+   source scripts/load-env.sh
+   ```
 
-For Option B, load the same file into your shell. The loader also sets `ZONE` to `databases.neo4j.io`, which the script keeps as a constant. Run it again after you edit `.env`:
+The script reads values only from the repo-root `.env` file. It has no flags for them and ignores exported shell variables. The loader also sets `ZONE` to `databases.neo4j.io`, which the script keeps as a constant.
 
-```bash
-source scripts/load-env.sh
-```
+### Extra steps for the manual setup
 
-`AURA_PLS_ALIAS` is the Private Link service name from the Aura console. `AURA_INSTANCE_ID` is the first label of the Aura hostname, so `abcd1234` for `abcd1234.databases.neo4j.io`. `REQUEST_MESSAGE` appears on the Aura approval screen. Make it identify your team so the Aura admin can match the request. The script falls back to a generic message when you leave it unset, and Option B reads it from the `.env` you loaded.
+Option A discovers most values for you. Option B has no discovery, so set every value yourself except the ones the loader [derives](env-setup.md#what-the-loader-does).
 
-**Where to find the network values.** These four describe your existing Azure network, so look them up rather than invent them:
-
-| Variable | What it is | Where to find it |
-|----------|------------|------------------|
-| `VNET` | Name of the VNet that holds the consumers. For classic Databricks, the workspace VNet. | Azure portal, Virtual networks. For a VNet-injected Databricks workspace, open the workspace Overview and read **Virtual network**. |
-| `VNET_RG` | Resource group that contains `VNET` | Azure portal, the VNet Overview page, **Resource group** |
-| `RG` | Resource group that will hold the private endpoint and the private DNS zone | Your choice. Use `VNET_RG` unless your team keeps networking resources elsewhere. |
-| `PE_SUBNET` | Name of a subnet in `VNET` for the private endpoint | Azure portal, the VNet, **Subnets**. Pick a subnet that is not delegated, or create a new one. |
-
-**What the script fills in for you.** With Option A you only have to set `AURA_PLS_ALIAS` in `.env`. The script discovers the rest when a value is missing, and prints what it found so you can copy it into `.env`. Option B has no discovery. The loader fills in only `AURA_INSTANCE_ID` from `NEO4J_URI`, `VNET_RG` from `RG`, and `ZONE`, so set every other value yourself. This is how the script finds each one:
+With Option A you only have to set `AURA_PLS_ALIAS` in `.env`. The script discovers the rest when a value is missing, and prints what it found so you can copy it into `.env`. This is how it finds each one:
 
 | Variable | How the script finds it |
 |----------|-------------------------|
 | `AURA_INSTANCE_ID` | The first label of `NEO4J_URI` |
 | `VNET`, `VNET_RG` | The custom VNet of a VNet-injected Databricks workspace. Set `WORKSPACE_NAME` in `.env` to pick the workspace. If you leave it unset, the script lists the VNet-injected workspaces in the subscription and asks which one. |
-| `RG` | The same value as `VNET_RG` |
+| `PE_RG` | The same value as `VNET_RG` |
 | `PE_SUBNET` | The subnets in `VNET` that are not delegated. It asks when more than one qualifies. |
 | `PE_NAME` | An existing `pe-<aura-instance-id>-*` endpoint, otherwise `pe-<aura-instance-id>-<VNet region>` |
 
-A workspace is VNet-injected only if you chose your own VNet when you created it. Otherwise Databricks creates a locked VNet in a managed resource group, which cannot hold a private endpoint, and the script skips that workspace. Use the [NCC manual setup](setup-ncc-manual.md) for it. If a VNet is not a workspace VNet, set `VNET` and `VNET_RG` yourself. Without a terminal to ask on, the script stops and lists the options instead.
+A workspace is VNet-injected only if you chose your own VNet when you created it.
 
-To list the same values from the CLI:
-
-```bash
-az network vnet list --query "[].{vnet:name, resourceGroup:resourceGroup}" -o table
-az network vnet subnet list --resource-group "$VNET_RG" --vnet-name "$VNET" \
-  --query "[].{subnet:name, delegation:delegations[0].serviceName}" -o table
-```
-
-Run the second command after you set `VNET` and `VNET_RG`. A subnet with a value in the `delegation` column cannot hold a private endpoint.
+- Otherwise Databricks creates a locked VNet in a managed resource group, which cannot hold a private endpoint, and the script skips that workspace. Use the [NCC manual setup](setup-ncc-manual.md) for it.
+- If a VNet is not a workspace VNet, set `VNET` and `VNET_RG` yourself.
+- Without a terminal to ask on, the script stops and lists the options instead.
 
 ### Classic Databricks workspaces
 
 A classic Databricks consumer adds a few requirements:
 
-- **Workspace type:** The workspace must be VNet-injected. You choose VNet injection when you create the workspace. A workspace in a Databricks-managed VNet cannot use this path, so use the [NCC manual setup](setup-ncc-manual.md) instead. To create a VNet-injected workspace in an existing VNet, run `uv run scripts/databricks_vnet_workspace.py up --dry-run`, then `up`. It creates `nsg-dbx`, the two delegated subnets `snet-dbx-host` and `snet-dbx-container`, and a Premium workspace named by `WORKSPACE_NAME` in `.env`. The subnets use `10.10.10.0/24` and `10.10.11.0/24` unless you pass `--host-cidr` and `--container-cidr`, so pick ranges inside your VNet that nothing else uses. The VNet needs a third subnet for the private endpoint.
-- **Endpoint subnet:** `PE_SUBNET` must be a separate subnet. The Databricks host and container subnets are delegated to `Microsoft.Databricks/workspaces`, and they cannot hold a private endpoint.
-- **VNet:** Set `VNET` to the workspace VNet. If the endpoint lives in another VNet, link the zone to the workspace VNet and peer the two VNets, as in [Batch jobs in other VNets](operations/batch-jobs-other-vnets.md).
-- **Custom DNS:** If the workspace VNet uses custom DNS servers, forward `databases.neo4j.io` and any `<orch>.neo4j.io` zones to `168.63.129.16`. Only that Azure resolver answers from your private DNS zones.
+- **Workspace type:** The workspace must be VNet-injected. You choose VNet injection when you create the workspace.
+  - A workspace in a Databricks-managed VNet cannot use this path. Use the [NCC manual setup](setup-ncc-manual.md) instead.
+  - To create a VNet-injected workspace in an existing VNet, run `uv run scripts/databricks_vnet_workspace.py up --dry-run`, then `up`.
+  - It creates `nsg-dbx`, the two delegated subnets `snet-dbx-host` and `snet-dbx-container`, and a Premium workspace named by `WORKSPACE_NAME` in `.env`.
+  - The subnets use `10.10.10.0/24` and `10.10.11.0/24` unless you pass `--host-cidr` and `--container-cidr`. Pick ranges inside your VNet that nothing else uses.
+  - The VNet needs a third subnet for the private endpoint.
+- **Endpoint subnet:** `PE_SUBNET` must be a separate subnet.
+  - The Databricks host and container subnets are delegated to `Microsoft.Databricks/workspaces`.
+  - A delegated subnet cannot hold a private endpoint.
+- **VNet:** Set `VNET` to the workspace VNet.
+  - If the endpoint lives in another VNet, link the zone to the workspace VNet and peer the two VNets, as in [Batch jobs in other VNets](operations/batch-jobs-other-vnets.md).
+- **Custom DNS:** If the workspace VNet uses custom DNS servers, forward `databases.neo4j.io` and any `<orch>.neo4j.io` zones to `168.63.129.16`.
+  - Only that Azure resolver answers from your private DNS zones.
 - **Outbound rules:** If you tightened the outbound NSG rules on the Databricks subnets, allow TCP 7687 to the endpoint subnet.
 
 ## Option A: Run the script
@@ -229,7 +221,7 @@ The endpoint must be in the same region as the VNet. The target Private Link ser
 ```bash
 az network private-endpoint create \
   --name "$PE_NAME" \
-  --resource-group "$RG" \
+  --resource-group "$PE_RG" \
   --subnet "$SUBNET_ID" \
   --nic-name "${PE_NAME}-nic" \
   --connection-name "${PE_NAME}-conn" \
@@ -257,7 +249,7 @@ Approve the incoming request in the Aura console, as in [Aura console Step 4](sh
 Poll the connection until it reads `Approved`:
 
 ```bash
-az network private-endpoint show --name "$PE_NAME" --resource-group "$RG" \
+az network private-endpoint show --name "$PE_NAME" --resource-group "$PE_RG" \
   --query "manualPrivateLinkServiceConnections[0].privateLinkServiceConnectionState.{status:status, description:description}" \
   -o json
 ```
@@ -267,7 +259,7 @@ az network private-endpoint show --name "$PE_NAME" --resource-group "$RG" \
 Read the private IP that Azure assigned to the endpoint NIC. The DNS records point at this address:
 
 ```bash
-NIC_ID="$(az network private-endpoint show --name "$PE_NAME" --resource-group "$RG" \
+NIC_ID="$(az network private-endpoint show --name "$PE_NAME" --resource-group "$PE_RG" \
   --query "networkInterfaces[0].id" -o tsv)"
 export PE_IP="$(az network nic show --ids "$NIC_ID" \
   --query "ipConfigurations[0].privateIPAddress" -o tsv)"
@@ -283,14 +275,14 @@ The endpoint gives you a private IP, but nothing yet connects the Aura hostname 
 Create the zone:
 
 ```bash
-az network private-dns zone create --resource-group "$RG" --name "$ZONE"
+az network private-dns zone create --resource-group "$PE_RG" --name "$ZONE"
 ```
 
 Link it to the VNet. Auto-registration stays off because you manage the records by hand:
 
 ```bash
 az network private-dns link vnet create \
-  --resource-group "$RG" \
+  --resource-group "$PE_RG" \
   --zone-name "$ZONE" \
   --name "${PE_NAME}-vnet-link" \
   --virtual-network "$VNET_ID" \
@@ -301,7 +293,7 @@ Attach the zone to the endpoint with a zone group. This ties the zone to the end
 
 ```bash
 az network private-endpoint dns-zone-group create \
-  --resource-group "$RG" \
+  --resource-group "$PE_RG" \
   --endpoint-name "$PE_NAME" \
   --name default \
   --zone-name "$ZONE" \
@@ -314,15 +306,15 @@ Your organization may run DNS centrally in a hub VNet. In that case do not creat
 
 ### Step 6: Add the instance A record
 
-Map the Aura instance label to the endpoint private IP. The record set uses a TTL of 30 seconds. A short TTL limits how long clients keep the old address if you [recreate the endpoint](#recreate-a-rejected-or-disconnected-endpoint) and it gets a different IP:
+Map the instance ID to the endpoint private IP. The record set uses a TTL of 30 seconds. A short TTL limits how long clients keep the old address if you [recreate the endpoint](#recreate-a-rejected-or-disconnected-endpoint) and it gets a different IP:
 
 ```bash
 az network private-dns record-set a create \
-  --resource-group "$RG" --zone-name "$ZONE" \
+  --resource-group "$PE_RG" --zone-name "$ZONE" \
   --name "$AURA_INSTANCE_ID" --ttl 30
 
 az network private-dns record-set a add-record \
-  --resource-group "$RG" --zone-name "$ZONE" \
+  --resource-group "$PE_RG" --zone-name "$ZONE" \
   --record-set-name "$AURA_INSTANCE_ID" \
   --ipv4-address "$PE_IP"
 ```
@@ -334,7 +326,7 @@ Without this record, lookups from the linked VNet return NXDOMAIN and the connec
 This applies to both options. With the script, run `destroy`, then run `run` again. By hand, delete the endpoint, then repeat [Step 2](#step-2-create-the-private-endpoint) through [Step 4](#step-4-check-the-connection-status):
 
 ```bash
-az network private-endpoint delete --name "$PE_NAME" --resource-group "$RG"
+az network private-endpoint delete --name "$PE_NAME" --resource-group "$PE_RG"
 ```
 
 A new endpoint can receive a different private IP. Update every A record you created, including the routing-host records, or the hostnames resolve to an address that no longer answers. The script does this for you when you run `dns` or `add-routing-host` again.
@@ -343,12 +335,12 @@ By hand, read the new `PE_IP` as in Step 4, then swap the address in each record
 
 ```bash
 az network private-dns record-set a remove-record \
-  --resource-group "$RG" --zone-name "$ZONE" \
+  --resource-group "$PE_RG" --zone-name "$ZONE" \
   --record-set-name "$AURA_INSTANCE_ID" --ipv4-address "<old-ip>" \
   --keep-empty-record-set
 
 az network private-dns record-set a add-record \
-  --resource-group "$RG" --zone-name "$ZONE" \
+  --resource-group "$PE_RG" --zone-name "$ZONE" \
   --record-set-name "$AURA_INSTANCE_ID" --ipv4-address "$PE_IP"
 ```
 
@@ -356,26 +348,75 @@ Repeat both commands for each routing-host record. Use `--zone-name "$ORCH_ZONE"
 
 ## Databricks setup and validation
 
-The Azure side is done. Both options leave you with a private endpoint, an approved connection, and an instance A record. The rest of this guide sets up Databricks and proves the path works. Work through these in order:
+The Azure side is done. Both options leave you with a private endpoint, an approved connection, and an instance A record. The rest of this guide sets up Databricks and proves the path works. First set `WORKSPACE_NAME`, `WS_RG`, `WORKSPACE_URL`, `WORKSPACE_PROFILE`, and the `NEO4J_*` values in `.env`, as in [Databricks workspace](env-setup.md#databricks-workspace) and [Neo4j Aura](env-setup.md#neo4j-aura), and load it again. Work through these in order:
 
 1. [Check the Azure side](#check-the-azure-side). Confirm the hostname resolves to the endpoint IP.
-2. [Collect your values](#collect-your-values). Gather the workspace URL, the CLI profile, and the endpoint IP.
-3. [Create the Neo4j secret scope](#create-the-neo4j-secret-scope) in the workspace.
-4. [Upload the notebooks](#upload-the-notebooks).
-5. [Create a classic cluster](#create-a-classic-cluster).
-6. [Run the validation notebook](#run-the-validation-notebook). The first run is expected to fail on routing hosts.
-7. [Add routing-host records](#add-routing-host-records) for the hosts the notebook names, then restart the cluster and run the notebook again.
-8. [Run the other notebooks](#run-the-other-notebooks).
-9. [Close the public endpoint](#close-the-public-endpoint). Do this only after validation succeeds.
-10. [Teardown](#teardown) when you no longer need the setup.
+2. [Create the Neo4j secret scope](#create-the-neo4j-secret-scope) in the workspace.
+3. [Upload the notebooks](#upload-the-notebooks).
+4. [Create a classic cluster](#create-a-classic-cluster).
+5. [Run the validation notebook](#run-the-validation-notebook). The first run is expected to fail on routing hosts.
+6. [Add routing-host records](#add-routing-host-records) for the hosts the notebook names, then restart the cluster and run the notebook again.
+7. [Run the other notebooks](#run-the-other-notebooks).
+8. [Close the public endpoint](#close-the-public-endpoint). Do this only after validation succeeds.
+9. [Teardown](#teardown) when you no longer need the setup.
 
 > **The workspace must be VNet-injected.** Every Databricks step below runs on a classic cluster in your VNet. A workspace in a Databricks-managed VNet cannot use this path, and neither can serverless compute. Use the [NCC manual setup](setup-ncc-manual.md) for those.
 
 ### Check the Azure side
 
-DNS on this path comes from the private DNS zone you linked to the VNet, not from Databricks. The `nslookup` and `nc` checks need a VM or pod inside a linked VNet. A machine outside the linked VNets resolves the public address, so a pass there says nothing about the private path. If you have no such machine yet, run `verify` below and go on to [Collect your values](#collect-your-values). Notebook `01` repeats the DNS and Bolt checks from the cluster.
+DNS on this path comes from the private DNS zone you linked to the VNet, not from Databricks. Only a machine in a linked VNet resolves the private address. A laptop outside the linked VNets resolves the public address, so a DNS or Bolt pass there says nothing about the private path.
 
-#### Check DNS and the Bolt port
+You do not need a VM to continue. Run the basic check below, then go on to [Create the Neo4j secret scope](#create-the-neo4j-secret-scope). Notebook `01` repeats the DNS and Bolt checks from the cluster, which is inside the VNet. The three sections after the basics are optional and need a machine in a linked VNet.
+
+#### Run verify
+
+[`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `PE_RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from `.env`, as set in [Before you start](#before-you-start). Without flags, `verify` checks the Azure side only, so it gives the same answer from your laptop as from inside the VNet:
+
+```bash
+uv run scripts/private_link.py verify
+```
+
+It prints the connection status and the endpoint IP, then compares every A record in your private DNS zones to that IP. It checks only the zones in `$PE_RG` that carry a link named `<PE_NAME>-vnet-link` or `<PE_NAME>-orch-link`, so it covers the single-VNet mode. With central hub DNS, check with a Bolt client from a linked VNet instead, as in [Check resolution from a consuming VNet](shared/private-dns-central.md#step-5-check-resolution-from-a-consuming-vnet).
+
+#### Run a Bolt query (optional)
+
+Run this from a machine in a linked VNet. Add `--bolt` to resolve the instance host, open a TCP connection to the Bolt port, and run `RETURN 1` through [`neo4j-cli`](https://github.com/neo4j/neo4j-cli) against `neo4j+s://<aura-instance-id>.databases.neo4j.io`. It reads `NEO4J_USERNAME` and `NEO4J_PASSWORD` from the repo-root `.env`:
+
+```bash
+uv run scripts/private_link.py verify --bolt
+```
+
+These checks run on the machine where you start the script. The result says whether the host resolves to a private or a public address. From a laptop outside the VNet it prints a `WARN` that it tested the public path, so a pass there cannot be mistaken for a pass on the private path.
+
+`neo4j-cli` has no routing-host resolver. A missing routing-host record makes `--bolt` fail with `Cannot resolve address p-...neo4j.io:7687`, and the error names the host. Add a record for it as in [Add routing-host records](#add-routing-host-records).
+
+**Manual.** Open a Bolt connection with `neo4j+s://<aura-instance-id>.databases.neo4j.io` from any Neo4j client in the linked VNet. A client without a routing-host resolver can report `Cannot resolve address p-...neo4j.io:7687`. The error names the host. Add a record for it as in [Add routing-host records](#add-routing-host-records).
+
+#### Resolve from a VM in the VNet (optional)
+
+Add `--vm <name>` to test from a VM in a linked VNet. The script uses `az vm run-command invoke`, so the VM must be running and its resource group must be one you can manage. It runs `getent hosts` for each A record and checks that the answer is the endpoint IP:
+
+```bash
+uv run scripts/private_link.py verify --vm my-jump-vm
+```
+
+If the VM is not in `PE_RG`, name its resource group:
+
+```bash
+uv run scripts/private_link.py verify --vm my-jump-vm --vm-resource-group my-vm-rg
+```
+
+Combine it with `--bolt` to also test the Bolt port from the VM. The script opens a TCP connection to port 7687 on the VM. The `RETURN 1` query still runs from the machine where you start the script, because `neo4j-cli` is not run on the VM:
+
+```bash
+uv run scripts/private_link.py verify --vm my-jump-vm --bolt
+```
+
+Classic Databricks cluster nodes are managed by Databricks, so you cannot target them with `--vm`. Use notebook `01` for the cluster.
+
+#### Check DNS and the Bolt port by hand (optional)
+
+Run these on a VM or pod inside a linked VNet:
 
 ```bash
 nslookup "${AURA_INSTANCE_ID}.databases.neo4j.io"
@@ -383,64 +424,6 @@ nc -vz -w 5 "${AURA_INSTANCE_ID}.databases.neo4j.io" 7687
 ```
 
 The `nslookup` answer must be the endpoint private IP. A public address means the VNet is not linked to the zone, or the A record is missing.
-
-#### Run a Bolt query
-
-**Script.** [`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from `.env`, as set in [Before you start](#before-you-start):
-
-```bash
-uv run scripts/private_link.py verify --bolt
-```
-
-`verify` compares every A record to the endpoint IP. It checks only the zones in `$RG` that carry a link named `<PE_NAME>-vnet-link` or `<PE_NAME>-orch-link`, so it covers the single-VNet mode. With central hub DNS, check with `nslookup` from a linked VNet and a Bolt client instead, as in [Check resolution from a consuming VNet](shared/private-dns-central.md#step-5-check-resolution-from-a-consuming-vnet).
-
-Add `--vm <name>` to resolve each host from a VM in the VNet. `--bolt` runs `RETURN 1` through [`neo4j-cli`](https://github.com/neo4j/neo4j-cli) against `neo4j+s://<aura-instance-id>.databases.neo4j.io`. Pass `--bolt-credential <name>` or `--bolt-env <file>` for the login. The check reports whether the host resolves to a private or a public address. A pass from a laptop therefore cannot be mistaken for a pass on the private path.
-
-`neo4j-cli` has no routing-host resolver. A missing routing-host record makes `--bolt` fail with `Cannot resolve address p-...neo4j.io:7687`, and the error names the host. Add a record for it as in [Add routing-host records](#add-routing-host-records).
-
-**Manual.** Open a Bolt connection with `neo4j+s://<aura-instance-id>.databases.neo4j.io` from any Neo4j client in the linked VNet. A client without a routing-host resolver can report `Cannot resolve address p-...neo4j.io:7687`. The error names the host. Add a record for it as in [Add routing-host records](#add-routing-host-records).
-
-### Collect your values
-
-The next steps need four values. Gather them now and keep them in `.env` or in your shell. The commands below use the shell variable names.
-
-| Value | What it is | How to find it |
-|-------|------------|----------------|
-| `WS_URL` | The workspace URL | `az databricks workspace show --resource-group "$WS_RG" --name "$WORKSPACE_NAME" --query workspaceUrl -o tsv`, with `https://` in front |
-| `WORKSPACE_PROFILE` | A Databricks CLI profile for that workspace | Create it with `databricks auth login`, as below |
-| `PE_IP` | The private endpoint IP. The notebooks take it as the `expected_pe_ip` widget. | The `az network nic show` command below. `private_link.py verify` prints it as `endpoint IP`. |
-| Neo4j credentials | `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` | The Aura console. You set them in `.env` in [Create the Neo4j secret scope](#create-the-neo4j-secret-scope). |
-
-`az databricks` is an Azure CLI extension. Install it once with `az extension add --name databricks`.
-
-Set `WORKSPACE_NAME` and `WS_RG` in `.env`, load it, then read the URL. This also confirms the workspace is VNet-injected. The last command prints the workspace VNet ID, and it prints nothing for a workspace in a Databricks-managed VNet:
-
-```bash
-source scripts/load-env.sh
-export WS_URL="https://$(az databricks workspace show --resource-group "$WS_RG" --name "$WORKSPACE_NAME" --query workspaceUrl -o tsv)"
-echo "$WS_URL"
-az databricks workspace show --resource-group "$WS_RG" --name "$WORKSPACE_NAME" --query "parameters.customVirtualNetworkId.value" -o tsv
-```
-
-Create a CLI profile for the workspace. A browser window opens for the login. Pick a profile name, then check it:
-
-```bash
-databricks auth login --host "$WS_URL" --profile "<profile-name>"
-databricks current-user me --profile "<profile-name>"
-```
-
-Set `WORKSPACE_PROFILE` in `.env` to that profile name, then load it again. The secret scope script reads it, and the commands below use it. If `WORKSPACE_PROFILE` already points at a different workspace, the secrets land there instead.
-
-```bash
-source scripts/load-env.sh
-```
-
-Read the endpoint IP. This command needs `RG` and `PE_NAME` in your shell. Both options have them once `.env` is loaded. If the script discovered `PE_NAME`, add it to `.env` from the `private_link.py` output and load `.env` again first:
-
-```bash
-export PE_IP=$(az network nic show --ids "$(az network private-endpoint show --resource-group "$RG" --name "$PE_NAME" --query 'networkInterfaces[0].id' -o tsv)" --query 'ipConfigurations[0].privateIPAddress' -o tsv)
-echo "$PE_IP"
-```
 
 ### Create the Neo4j secret scope
 
@@ -477,40 +460,7 @@ Open the `neo4j-privatelink-pl` folder in the workspace to see the four notebook
 
 ### Create a classic cluster
 
-The notebooks must run on a classic cluster, because only classic compute runs in your VNet. Serverless compute does not, so it cannot reach the private endpoint. A single-node cluster is enough. It costs money while it runs, so the command sets it to stop after 30 minutes idle.
-
-The loader sets `SPARK_VERSION` to `16.4.x-scala2.12`, the runtime the notebooks were tested on. To use another one, set `SPARK_VERSION` in `.env` and load it again. List the Long Term Support runtime versions to check that yours is available. Then confirm the node type exists in your region:
-
-```bash
-databricks --profile "$WORKSPACE_PROFILE" clusters spark-versions -o json | jq -r '.versions[] | select(.name | test("LTS")) | select(.key | test("ml|gpu|photon|aarch64") | not) | .key' | sort -V
-databricks --profile "$WORKSPACE_PROFILE" clusters list-node-types -o json | jq -r '.node_types[] | select(.node_type_id=="Standard_DS3_v2") | .node_type_id'
-```
-
-The second command must print `Standard_DS3_v2`. If it prints nothing, pick another node type from `list-node-types`.
-
-Create the cluster and save its ID:
-
-```bash
-export CLUSTER_ID=$(databricks --profile "$WORKSPACE_PROFILE" clusters create --no-wait --json "{
-  \"cluster_name\": \"pl-test\",
-  \"spark_version\": \"$SPARK_VERSION\",
-  \"node_type_id\": \"Standard_DS3_v2\",
-  \"num_workers\": 0,
-  \"autotermination_minutes\": 30,
-  \"data_security_mode\": \"SINGLE_USER\",
-  \"spark_conf\": {\"spark.databricks.cluster.profile\": \"singleNode\", \"spark.master\": \"local[*]\"},
-  \"custom_tags\": {\"ResourceClass\": \"SingleNode\"}
-}" | jq -r .cluster_id)
-echo "$CLUSTER_ID"
-```
-
-Wait until the cluster is running. This takes 5 to 10 minutes. Run the second command again until it prints `RUNNING`:
-
-```bash
-databricks --profile "$WORKSPACE_PROFILE" clusters get "$CLUSTER_ID" -o json | jq -r '.state, .state_message'
-```
-
-To use the portal instead, open **Compute**, choose **Create compute**, and pick **Single node** with access mode **Single user**.
+Create a classic compute in your Databricks workspace. The notebooks must run on classic compute, because only classic compute runs in your VNet. Serverless compute does not, so it cannot reach the private endpoint.
 
 **Restart running clusters after DNS changes.** A cluster that resolved the host before the record existed can keep the public answer cached. Restart it after you create or change any A record or zone link.
 
@@ -518,10 +468,10 @@ To use the portal instead, open **Compute**, choose **Create compute**, and pick
 
 Run the notebooks in the workspace, not from the CLI:
 
-1. Open the workspace at `$WS_URL`, then open the `neo4j-privatelink-pl` folder and the notebook `01_validate_connectivity`.
-2. In the compute dropdown at the top, attach the cluster `pl-test`. It must show as running.
+1. Open the workspace at `$WORKSPACE_URL`, then open the `neo4j-privatelink-pl` folder and the notebook `01_validate_connectivity`.
+2. In the compute dropdown at the top, attach your classic compute. It must show as running.
 3. Fill in the widgets at the top of the notebook.
-   - `expected_pe_ip`: the value of `$PE_IP`.
+   - `expected_pe_ip`: the value of `$PE_IP`. Read it as in [Azure network](env-setup.md#azure-network-private-link-path) if it is not set. `private_link.py verify` also prints it as `endpoint IP`.
    - `use_resolver`: `false`.
 4. Click **Run all**.
 
@@ -560,17 +510,17 @@ echo "$ORCH_ZONE $ROUTING_LABEL"
 The commands below also use `PE_IP` and `VNET_ID`. The loader does not set them, so read them again if you are in a new terminal:
 
 ```bash
-export PE_IP=$(az network nic show --ids "$(az network private-endpoint show --resource-group "$RG" --name "$PE_NAME" --query 'networkInterfaces[0].id' -o tsv)" --query 'ipConfigurations[0].privateIPAddress' -o tsv)
+export PE_IP=$(az network nic show --ids "$(az network private-endpoint show --resource-group "$PE_RG" --name "$PE_NAME" --query 'networkInterfaces[0].id' -o tsv)" --query 'ipConfigurations[0].privateIPAddress' -o tsv)
 export VNET_ID="$(az network vnet show --resource-group "$VNET_RG" --name "$VNET" --query id -o tsv)"
 ```
 
 Create the zone and link it to the same VNet:
 
 ```bash
-az network private-dns zone create --resource-group "$RG" --name "$ORCH_ZONE"
+az network private-dns zone create --resource-group "$PE_RG" --name "$ORCH_ZONE"
 
 az network private-dns link vnet create \
-  --resource-group "$RG" \
+  --resource-group "$PE_RG" \
   --zone-name "$ORCH_ZONE" \
   --name "${PE_NAME}-orch-link" \
   --virtual-network "$VNET_ID" \
@@ -581,11 +531,11 @@ Add one record set and one A record per routing host. The record set gets the sa
 
 ```bash
 az network private-dns record-set a create \
-  --resource-group "$RG" --zone-name "$ORCH_ZONE" \
+  --resource-group "$PE_RG" --zone-name "$ORCH_ZONE" \
   --name "$ROUTING_LABEL" --ttl 30
 
 az network private-dns record-set a add-record \
-  --resource-group "$RG" --zone-name "$ORCH_ZONE" \
+  --resource-group "$PE_RG" --zone-name "$ORCH_ZONE" \
   --record-set-name "$ROUTING_LABEL" \
   --ipv4-address "$PE_IP"
 ```
@@ -594,14 +544,7 @@ Repeat the record commands for every routing host a client reports. For each hos
 
 Do not use a `p-*` record. An Azure private DNS wildcard must be the whole label `*`, so `p-*` matches nothing. A `*` record would point every host under that domain at your endpoint, so add one record per host instead.
 
-Whether you used the script or the manual commands, restart the cluster after you add the records so it drops cached DNS answers. Then run `01_validate_connectivity` again with the same widget values. It should pass.
-
-```bash
-databricks --profile "$WORKSPACE_PROFILE" clusters restart "$CLUSTER_ID"
-databricks --profile "$WORKSPACE_PROFILE" clusters get "$CLUSTER_ID" -o json | jq -r '.state'
-```
-
-Wait until the state is `RUNNING`.
+Whether you used the script or the manual commands, restart the cluster from the **Compute** page after you add the records so it drops cached DNS answers. Wait until it is running. Then run `01_validate_connectivity` again with the same widget values. It should pass.
 
 ### Run the other notebooks
 
@@ -621,10 +564,9 @@ Disable public access only after validation succeeds. Doing it earlier can lock 
 
 ### Teardown
 
-The classic cluster keeps costing money until it stops, so delete it first. If you created the workspace with `scripts/databricks_vnet_workspace.py`, the same script removes the workspace, its two subnets, and the NSG:
+The classic cluster keeps costing money until it stops, so delete it first from the **Compute** page. If you created the workspace with `scripts/databricks_vnet_workspace.py`, the same script removes the workspace, its two subnets, and the NSG:
 
 ```bash
-databricks --profile "$WORKSPACE_PROFILE" clusters permanent-delete "$CLUSTER_ID"
 uv run scripts/databricks_vnet_workspace.py down --dry-run
 uv run scripts/databricks_vnet_workspace.py down
 ```

@@ -2,7 +2,7 @@
 
 This guide applies to the Private Link path, where a private endpoint sits in your own VNet. When public access is disabled on Aura, a workload in a VNet that is not linked to the private DNS zone for `databases.neo4j.io` resolves the Aura hostname through public DNS. It receives the public IP, and Aura refuses the connection.
 
-The commands use `RG` and `PE_IP` from setup. Load them with `source scripts/load-env.sh`, as in [Environment setup](../env-setup.md).
+The commands use `PE_RG` and `PE_IP` from setup. Load them with `source scripts/load-env.sh`, as in [Environment setup](../env-setup.md).
 
 The fixes below restore connectivity for Azure workloads in other VNets. Affected workloads include classic Databricks clusters, Azure Data Factory, Azure Kubernetes Service, Azure Machine Learning compute clusters, Azure Functions, and any VM-based batch process.
 
@@ -256,15 +256,15 @@ Each Aura instance needs its own A record in the `databases.neo4j.io` private DN
 
 Changing `aura_instance_id` in an existing stack does not add a second record. Terraform replaces the existing A record, so the first instance stops resolving privately.
 
-For a second instance, add its A record to the existing zone by hand. Point it at the private endpoint IP that serves the instance. `RG` is the resource group that holds the zone. `PE_IP` is the endpoint IP from [Private Link manual setup Step 4](../setup-private-link-manual.md#step-4-check-the-connection-status):
+For a second instance, add its A record to the existing zone by hand. Point it at the private endpoint IP that serves the instance. `PE_RG` is the resource group that holds the zone. `PE_IP` is the endpoint IP from [Private Link manual setup Step 4](../setup-private-link-manual.md#step-4-check-the-connection-status):
 
 ```bash
 az network private-dns record-set a create \
-  --resource-group "$RG" --zone-name databases.neo4j.io \
+  --resource-group "$PE_RG" --zone-name databases.neo4j.io \
   --name "<second-aura-instance-id>" --ttl 30
 
 az network private-dns record-set a add-record \
-  --resource-group "$RG" --zone-name databases.neo4j.io \
+  --resource-group "$PE_RG" --zone-name databases.neo4j.io \
   --record-set-name "<second-aura-instance-id>" \
   --ipv4-address "$PE_IP"
 ```

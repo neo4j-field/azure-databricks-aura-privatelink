@@ -111,11 +111,11 @@ The `state rm` drops the already-deleted NCC from Terraform state so the stack r
 Delete only what you created in [Private Link manual setup](../setup-private-link-manual.md). Never delete a hub zone that other teams use.
 
 ```bash
-az network private-endpoint delete --name "$PE_NAME" --resource-group "$RG"
+az network private-endpoint delete --name "$PE_NAME" --resource-group "$PE_RG"
 
-az network private-dns link vnet delete --resource-group "$RG" \
+az network private-dns link vnet delete --resource-group "$PE_RG" \
   --zone-name "$ZONE" --name "${PE_NAME}-vnet-link" --yes
-az network private-dns zone delete --resource-group "$RG" --name "$ZONE" --yes
+az network private-dns zone delete --resource-group "$PE_RG" --name "$ZONE" --yes
 ```
 
 Deleting the zone removes the A records inside it. If you created an `<orch>.neo4j.io` zone, delete its link and the zone the same way.

@@ -21,17 +21,17 @@ Auth is the Azure CLI session:
   az account set --subscription <subscription-id>
 
 Settings come only from the repo-root .env file. There are no flags for them and
-exported shell variables are ignored: RG, VNET, VNET_RG, PE_SUBNET, PE_NAME,
+exported shell variables are ignored: PE_RG, VNET, VNET_RG, PE_SUBNET, PE_NAME,
 AURA_PLS_ALIAS, AURA_INSTANCE_ID, WORKSPACE_NAME, REQUEST_MESSAGE.
 Only AURA_PLS_ALIAS has no default. The script fills in the rest when unset:
   AURA_INSTANCE_ID  the first label of NEO4J_URI
   VNET, VNET_RG     the custom VNet of a VNet-injected Databricks workspace. Set
                     WORKSPACE_NAME to pick one, otherwise the script
                     lists the workspaces in the subscription and asks.
-  RG                VNET_RG
+  PE_RG             VNET_RG
   PE_SUBNET         a subnet in VNET that is not delegated. It asks if there are several,
                     and marks the likeliest one as the default.
-  PE_NAME           an existing pe-<instance-id>-* endpoint in RG, else
+  PE_NAME           an existing pe-<instance-id>-* endpoint in PE_RG, else
                     pe-<instance-id>-<VNet region>
 When it cannot ask because stdin is not a terminal, it stops and lists the options.
 
@@ -84,7 +84,7 @@ from dotenv import dotenv_values
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ZONE = "databases.neo4j.io"
 ENV_KEYS = {
-    "resource_group": "RG",
+    "resource_group": "PE_RG",
     "vnet": "VNET",
     "vnet_resource_group": "VNET_RG",
     "subnet": "PE_SUBNET",
@@ -319,7 +319,7 @@ def discover_network(s: Settings) -> None:
     if s.vnet:
         if not s.resource_group and s.vnet_resource_group:
             s.resource_group = s.vnet_resource_group
-            s.found("RG", s.resource_group, "same as VNET_RG")
+            s.found("PE_RG", s.resource_group, "same as VNET_RG")
         return
     workspace = choose_workspace(s)
     group, name = parse_vnet_id(workspace.vnet_id)
@@ -329,7 +329,7 @@ def discover_network(s: Settings) -> None:
     s.found("VNET_RG", group, source)
     if not s.resource_group:
         s.resource_group = group
-        s.found("RG", group, "same as VNET_RG")
+        s.found("PE_RG", group, "same as VNET_RG")
     if not s.workspace:
         s.found("WORKSPACE_NAME", workspace.name, "chosen")
 
@@ -415,13 +415,13 @@ def discover_endpoint(s: Settings) -> None:
         matches = [m for m in matches if m["name"] == s.name]
     if matches:
         labels = [f"{m['name']}  ({m['rg']})" for m in matches]
-        chosen = matches[pick("a private endpoint", labels, "PE_NAME and RG")]
+        chosen = matches[pick("a private endpoint", labels, "PE_NAME and PE_RG")]
         if not s.name:
             s.name = chosen["name"]
             s.found("PE_NAME", s.name, "existing endpoint")
         if not s.resource_group:
             s.resource_group = chosen["rg"]
-            s.found("RG", s.resource_group, "existing endpoint")
+            s.found("PE_RG", s.resource_group, "existing endpoint")
     elif not s.name and s.vnet and s.vnet_rg:
         region = az_tsv("network", "vnet", "show", "--resource-group", s.vnet_rg,
                         "--name", s.vnet, "--query", "location")  # fmt: skip
@@ -955,10 +955,13 @@ def cmd_verify(args: argparse.Namespace, s: Settings) -> int:
     bolt = None
     if args.bolt:
         s.require("instance_id")
+        env_file = args.bolt_env
+        if not (args.bolt_credential or env_file):
+            env_file = str(REPO_ROOT / ".env")
         bolt = BoltOptions(
             args.bolt_uri or f"neo4j+s://{s.instance_host}",
             args.bolt_credential,
-            args.bolt_env,
+            env_file,
         )
     ok = verify(s, args.vm, args.vm_resource_group, bolt)
     print("\n  PASS" if ok else "\n  FAIL")
@@ -1025,11 +1028,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_add_routing_host)
     p = sub.add_parser("verify", parents=[common])
     p.add_argument("--vm", help="resolve each host from this VM via run-command")
-    p.add_argument("--vm-resource-group", help="defaults to RG")
+    p.add_argument("--vm-resource-group", help="defaults to PE_RG")
     p.add_argument("--bolt", action="store_true", help="run a connectivity test with neo4j-cli")
     p.add_argument("--bolt-uri", help="default: neo4j+s://<instance-id>.databases.neo4j.io")
-    p.add_argument("--bolt-credential", help="neo4j-cli stored credential name")
-    p.add_argument("--bolt-env", help="path to a .env file with NEO4J_USERNAME and NEO4J_PASSWORD")
+    p.add_argument("--bolt-credential", help="neo4j-cli stored credential name. Without it, the login comes from the repo .env")
+    p.add_argument("--bolt-env", help="path to a .env file with NEO4J_USERNAME and NEO4J_PASSWORD. Default: the repo .env")
     p.set_defaults(func=cmd_verify)
     sub.add_parser("run", parents=[common, wait, dry]).set_defaults(func=cmd_run)
     sub.add_parser("destroy", parents=[common, dry]).set_defaults(func=cmd_destroy)
@@ -1042,7 +1045,7 @@ def main() -> int:
     args = build_parser().parse_args()
     DRY_RUN = getattr(args, "dry_run", False)
     settings = Settings(
-        resource_group=config("RG"),
+        resource_group=config("PE_RG"),
         vnet=config("VNET"),
         vnet_resource_group=config("VNET_RG"),
         subnet=config("PE_SUBNET"),

@@ -2,7 +2,7 @@
 
 Entries are grouped by path. **NCC** covers Databricks Serverless. **Private Link** covers a private endpoint in your own VNet. **Both paths** covers Bolt, TLS, public access, and secret scope problems that can happen on either path.
 
-The commands read variables such as `WORKSPACE_PROFILE`, `RG`, and `PE_NAME`. Load them with `source scripts/load-env.sh`, as in [Environment setup](../env-setup.md).
+The commands read variables such as `WORKSPACE_PROFILE`, `PE_RG`, and `PE_NAME`. Load them with `source scripts/load-env.sh`, as in [Environment setup](../env-setup.md).
 
 ## NCC (Databricks Serverless)
 
@@ -92,13 +92,13 @@ driver = GraphDatabase.driver(
 
 **Symptom:** On the Private Link path, `nslookup <aura-instance-id>.databases.neo4j.io` from a VM or cluster in your VNet returns a public IP instead of the private endpoint IP.
 
-**Cause:** The VNet is not linked to the `databases.neo4j.io` private DNS zone, or the zone has no A record for the instance label.
+**Cause:** The VNet is not linked to the `databases.neo4j.io` private DNS zone, or the zone has no A record for the instance ID.
 
 **Fix:** Check the link and the record:
 
 ```bash
-az network private-dns link vnet list --resource-group "$RG" --zone-name databases.neo4j.io -o table
-az network private-dns record-set a show --resource-group "$RG" --zone-name databases.neo4j.io --name "$AURA_INSTANCE_ID"
+az network private-dns link vnet list --resource-group "$PE_RG" --zone-name databases.neo4j.io -o table
+az network private-dns record-set a show --resource-group "$PE_RG" --zone-name databases.neo4j.io --name "$AURA_INSTANCE_ID"
 ```
 
 Add a missing link or record as in [Private Link manual setup](../setup-private-link-manual.md#step-5-create-the-private-dns-zone-and-link-it). With central hub DNS, check the hub zone and the resolver forwarding rule instead, as in [Set up central hub DNS](../shared/private-dns-central.md#set-up-central-hub-dns). A check run from a laptop always returns the public IP, so run it from inside the linked VNet.

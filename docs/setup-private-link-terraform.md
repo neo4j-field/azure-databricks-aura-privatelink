@@ -98,9 +98,9 @@ Set these values in the repo-root `.env`, copying them from `terraform.tfvars`:
 
 | `.env` variable | `terraform.tfvars` variable |
 |-----------------|-----------------------------|
-| `RG` | `resource_group_name` |
+| `PE_RG` | `resource_group_name` |
 | `VNET` | `virtual_network_name` |
-| `VNET_RG` | `vnet_resource_group_name`. The loader uses the value of `RG` when you leave it unset. |
+| `VNET_RG` | `vnet_resource_group_name`. The loader uses the value of `PE_RG` when you leave it unset. |
 | `PE_NAME` | `private_endpoint_name` |
 
 Run the commands in this section from `infra/terraform/azure-private-endpoint`. Load `.env` into your shell first:
@@ -109,7 +109,7 @@ Run the commands in this section from `infra/terraform/azure-private-endpoint`. 
 source ../../../scripts/load-env.sh
 ```
 
-**Script.** The script reads `RG`, `VNET`, `VNET_RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the same `.env`, and ignores exported variables. Run this once for each host a client reports. It creates the zone and the link the first time and adds one A record each time:
+**Script.** The script reads `PE_RG`, `VNET`, `VNET_RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the same `.env`, and ignores exported variables. Run this once for each host a client reports. It creates the zone and the link the first time and adds one A record each time:
 
 ```bash
 uv run ../../../scripts/private_link.py add-routing-host "p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"
@@ -127,10 +127,10 @@ export VNET_ID="$(az network vnet show --resource-group "$VNET_RG" \
 Create the zone and link it to the VNet. The link name `${PE_NAME}-orch-link` matches the script, so `verify` checks this zone:
 
 ```bash
-az network private-dns zone create --resource-group "$RG" --name "$ORCH_ZONE"
+az network private-dns zone create --resource-group "$PE_RG" --name "$ORCH_ZONE"
 
 az network private-dns link vnet create \
-  --resource-group "$RG" \
+  --resource-group "$PE_RG" \
   --zone-name "$ORCH_ZONE" \
   --name "${PE_NAME}-orch-link" \
   --virtual-network "$VNET_ID" \
@@ -141,11 +141,11 @@ Add one record set and one A record per routing host. The record set gets the sa
 
 ```bash
 az network private-dns record-set a create \
-  --resource-group "$RG" --zone-name "$ORCH_ZONE" \
+  --resource-group "$PE_RG" --zone-name "$ORCH_ZONE" \
   --name "$ROUTING_LABEL" --ttl 30
 
 az network private-dns record-set a add-record \
-  --resource-group "$RG" --zone-name "$ORCH_ZONE" \
+  --resource-group "$PE_RG" --zone-name "$ORCH_ZONE" \
   --record-set-name "$ROUTING_LABEL" \
   --ipv4-address "$PE_IP"
 ```
@@ -160,7 +160,7 @@ After you add the records, run the validation again.
 
 DNS on this path comes from the private DNS zone you linked to the VNet, not from Databricks. Run every check from a VM, cluster, or pod inside a linked VNet. A machine outside the linked VNets resolves the public address, so a pass there says nothing about the private path.
 
-The checks below and the script read `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from `.env`. Copy them from `resource_group_name`, `private_endpoint_name`, and `aura_instance_id` in `terraform.tfvars`. The loader takes `AURA_INSTANCE_ID` from `NEO4J_URI` when you leave it unset. Load the file from the repository root:
+The checks below and the script read `PE_RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from `.env`. Copy them from `resource_group_name`, `private_endpoint_name`, and `aura_instance_id` in `terraform.tfvars`. The loader takes `AURA_INSTANCE_ID` from `NEO4J_URI` when you leave it unset. Load the file from the repository root:
 
 ```bash
 source scripts/load-env.sh
@@ -177,13 +177,13 @@ The `nslookup` answer must be the endpoint private IP. A public address means th
 
 ### Run a Bolt query
 
-**Script.** [`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the same `.env`. Run it from the repository root:
+**Script.** [`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `PE_RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the same `.env`. Run it from the repository root:
 
 ```bash
 uv run scripts/private_link.py verify --bolt
 ```
 
-`verify` compares every A record to the endpoint IP. It checks only the zones in `$RG` that carry a link named `<PE_NAME>-vnet-link` or `<PE_NAME>-orch-link`. It therefore covers the single-VNet mode, which is this stack with `manage_private_dns = true`. With central hub DNS, check with `nslookup` from a linked VNet and a Bolt client instead, as in [Check resolution from a consuming VNet](shared/private-dns-central.md#step-5-check-resolution-from-a-consuming-vnet).
+`verify` compares every A record to the endpoint IP. It checks only the zones in `$PE_RG` that carry a link named `<PE_NAME>-vnet-link` or `<PE_NAME>-orch-link`. It therefore covers the single-VNet mode, which is this stack with `manage_private_dns = true`. With central hub DNS, check with `nslookup` from a linked VNet and a Bolt client instead, as in [Check resolution from a consuming VNet](shared/private-dns-central.md#step-5-check-resolution-from-a-consuming-vnet).
 
 Add `--vm <name>` to resolve each host from a VM in the VNet. `--bolt` runs `RETURN 1` through [`neo4j-cli`](https://github.com/neo4j/neo4j-cli) against `neo4j+s://<aura-instance-id>.databases.neo4j.io`. Pass `--bolt-credential <name>` or `--bolt-env <file>` for the login. The check reports whether the host resolves to a private or a public address. A pass from a laptop therefore cannot be mistaken for a pass on the private path.
 

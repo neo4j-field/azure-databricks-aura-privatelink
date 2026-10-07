@@ -47,14 +47,14 @@ You now have the two values every setup path needs. Put them in the repo-root `.
 
 ```bash
 AURA_PLS_ALIAS="production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice"
-AURA_PRIVATE_HOSTNAME="<aura-instance-id>.databases.neo4j.io"
+NEO4J_URI="neo4j+s://<aura-instance-id>.databases.neo4j.io"
 ```
 
 ```bash
 source scripts/load-env.sh
 ```
 
-`AURA_PRIVATE_HOSTNAME` is the host of `NEO4J_URI`, so the loader fills it in when you leave it out. [Environment setup](../env-setup.md) covers every other value.
+The loader takes the instance host (`AURA_PRIVATE_HOSTNAME`) and the instance ID (`AURA_INSTANCE_ID`) from `NEO4J_URI`. [Aura host names](../env-setup.md#aura-host-names) says how they differ. [Environment setup](../env-setup.md) covers every other value.
 
 ## Step 3: Allow-list the consumer subscription
 

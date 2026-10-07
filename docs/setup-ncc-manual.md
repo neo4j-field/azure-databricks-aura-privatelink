@@ -66,7 +66,7 @@ source scripts/load-env.sh
 printenv WORKSPACE_PROFILE WORKSPACE_URL WORKSPACE_NAME ACCOUNT_PROFILE DATABRICKS_ACCOUNT_ID AURA_PLS_ALIAS AURA_PRIVATE_HOSTNAME NCC_REGION
 ```
 
-`AURA_PRIVATE_HOSTNAME` is the host of `NEO4J_URI`, so the loader fills it in unless you set it yourself.
+`AURA_PRIVATE_HOSTNAME` is the instance host, taken from `NEO4J_URI`, so the loader fills it in unless you set it yourself.
 
 **Workspace CLI profile.** The profile must exist and authenticate. Check it:
 
@@ -182,7 +182,7 @@ echo "$RULE_ID"
 Where:
 
 - `AURA_PLS_ALIAS` is the Private Link service name from [Aura console Step 2](shared/aura-console-steps.md#step-2-enable-private-link-in-aura-network-access-configuration).
-- `AURA_PRIVATE_HOSTNAME` is the Private URI hostname from Aura, for example `<aura-instance-id>.databases.neo4j.io`.
+- `AURA_PRIVATE_HOSTNAME` is the instance host, the host of the Private URI from Aura, for example `<aura-instance-id>.databases.neo4j.io`.
 
 The rule starts as `PENDING`.
 
@@ -298,7 +298,7 @@ Run these checks after the rule reads `ESTABLISHED` in [Step 5](#step-5-check-th
 
 ### Create the secret scope
 
-The notebooks read Neo4j credentials from a secret scope named `neo4j` in the workspace. Fill in the `NEO4J_*` values in the `.env` you created in [Step 0](#step-0-sign-in-and-collect-your-values). The URI host must match the Private URI host you gave the rule in [Step 3](#step-3-create-the-private-endpoint-rule). `.env` is gitignored. Then run the script from the repository root. It creates the scope and stores the `uri`, `username`, `password`, and `database` keys:
+The notebooks read Neo4j credentials from a secret scope named `neo4j` in the workspace. Fill in the `NEO4J_*` values in the `.env` you created in [Step 0](#step-0-sign-in-and-collect-your-values). The URI host is the instance host, and it must match the one you gave the rule in [Step 3](#step-3-create-the-private-endpoint-rule). `.env` is gitignored. Then run the script from the repository root. It creates the scope and stores the `uri`, `username`, `password`, and `database` keys:
 
 ```bash
 ./scripts/create-secret-scope.sh

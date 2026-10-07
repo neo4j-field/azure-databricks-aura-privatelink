@@ -43,7 +43,7 @@ Then wire DNS in the hub as in [Set up central hub DNS](#set-up-central-hub-dns)
 
 These steps use the Azure CLI. The portal equivalents live under **Private DNS zones** and **DNS Private Resolver**. The same objects map to your own Terraform or Bicep if the hub is codified. These steps replace Steps 5 and 6 of the manual guide.
 
-Set `HUB_RG`, the resource group that owns the private DNS zones, in `.env`. `AURA_INSTANCE_ID` is the first label of the Aura hostname, so `abcd1234` for `abcd1234.databases.neo4j.io`. The loader takes it from `NEO4J_URI` and sets `ZONE` to `databases.neo4j.io`, so you only need to set them in `.env` to override those values. Then load the file:
+Set `HUB_RG`, the resource group that owns the private DNS zones, in `.env`. `AURA_INSTANCE_ID` is the instance ID, the first label of the instance host. The loader takes it from `NEO4J_URI` and sets `ZONE` to `databases.neo4j.io`, so you only need to set them in `.env` to override those values. See [Aura host names](../env-setup.md#aura-host-names). Then load the file:
 
 ```bash
 source scripts/load-env.sh
@@ -55,10 +55,10 @@ Read the endpoint private IP into `PE_IP`. On the Terraform path, run this from 
 export PE_IP="$(terraform output -raw private_endpoint_nic_ip)"
 ```
 
-On the manual path, use the commands from [Step 4 of the manual guide](../setup-private-link-manual.md#step-4-check-the-connection-status). `RG` and `PE_NAME` are the resource group and name of the endpoint, not the hub:
+On the manual path, use the commands from [Step 4 of the manual guide](../setup-private-link-manual.md#step-4-check-the-connection-status). `PE_RG` and `PE_NAME` are the resource group and name of the endpoint, not the hub:
 
 ```bash
-NIC_ID="$(az network private-endpoint show --name "$PE_NAME" --resource-group "$RG" \
+NIC_ID="$(az network private-endpoint show --name "$PE_NAME" --resource-group "$PE_RG" \
   --query "networkInterfaces[0].id" -o tsv)"
 export PE_IP="$(az network nic show --ids "$NIC_ID" \
   --query "ipConfigurations[0].privateIPAddress" -o tsv)"
@@ -91,7 +91,7 @@ The hub may front DNS with Azure DNS Private Resolver. In that model the spokes 
 
 ### Step 3: Add the instance A record
 
-Map the Aura instance label to the endpoint private IP in the hub zone. The TTL of 30 seconds matches the script and the Terraform stack:
+Map the instance ID to the endpoint private IP in the hub zone. The TTL of 30 seconds matches the script and the Terraform stack:
 
 ```bash
 az network private-dns record-set a create \
@@ -149,7 +149,7 @@ Do not use a `p-*` record. An Azure private DNS wildcard must be the whole label
 
 ### Step 5: Check resolution from a consuming VNet
 
-`private_link.py verify` checks only zones in `$RG` that carry the link names the script uses. It does not cover a hub zone. Check from a VM, cluster, or pod in a linked VNet instead:
+`private_link.py verify` checks only zones in `$PE_RG` that carry the link names the script uses. It does not cover a hub zone. Check from a VM, cluster, or pod in a linked VNet instead:
 
 ```bash
 nslookup "${AURA_INSTANCE_ID}.databases.neo4j.io"   # must return the endpoint private IP

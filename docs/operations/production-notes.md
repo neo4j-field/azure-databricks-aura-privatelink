@@ -34,7 +34,7 @@ Notes are grouped by path. **NCC** covers Databricks Serverless. **Private Link*
 | Gotcha | Mitigation |
 |--------|-----------|
 | NCC private endpoint rules for third-party PLS need the REST API or CLI, because the console UI is Azure-native only | Use the [manual NCC guide](../setup-ncc-manual.md#step-3-create-the-private-endpoint-rule) or [scripts/create-private-endpoint-rule.sh](../../scripts/create-private-endpoint-rule.sh) |
-| `domain_names` must be supplied or DNS will resolve to the public IP | Always include the Aura Private URI hostname in the API call |
+| `domain_names` must be supplied or DNS will resolve to the public IP | Always include the instance host (the host of the Private URI) in the API call |
 | 14-day expiry on unapproved rules | Approve promptly in the Aura console |
 | 10-minute NCC propagation after attach | Wait 10 minutes, then restart serverless services |
 | An NCC does not restrict other outbound traffic from serverless compute | This repo does not configure serverless egress control. If you add a restricted network policy, allow the Aura hostnames and any package index your notebooks use, such as PyPI for `%pip install` |

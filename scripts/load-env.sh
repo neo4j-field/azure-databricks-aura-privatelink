@@ -13,11 +13,9 @@
 #
 # Derived when unset (no network calls):
 #   ZONE                     databases.neo4j.io
-#   SPARK_VERSION            16.4.x-scala2.12
 #   AURA_PRIVATE_HOSTNAME    the host of NEO4J_URI
 #   AURA_INSTANCE_ID         the first label of AURA_PRIVATE_HOSTNAME
-#   VNET_RG                  RG
-#   WS_URL / WORKSPACE_URL   copied from each other
+#   VNET_RG                  PE_RG
 #   ORCH_ZONE, ROUTING_LABEL split from ROUTING_HOST
 #
 # Optional lookup (NCC path, needs a network call):
@@ -118,10 +116,7 @@ _pl_derive() {
 }
 
 _pl_derive ZONE "databases.neo4j.io"
-_pl_derive SPARK_VERSION "16.4.x-scala2.12"
-_pl_derive VNET_RG "${RG:-}"
-_pl_derive WS_URL "${WORKSPACE_URL:-}"
-_pl_derive WORKSPACE_URL "${WS_URL:-}"
+_pl_derive VNET_RG "${PE_RG:-}"
 
 # NEO4J_URI is neo4j+s://<host>[:port][/path]. Take the host.
 _pl_host="${NEO4J_URI:-}"

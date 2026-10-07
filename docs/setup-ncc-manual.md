@@ -1,6 +1,6 @@
 # NCC manual setup
 
-This guide creates the Databricks side of the private path by hand: an NCC, a private endpoint rule for the Aura Private Link service, and the binding that attaches the NCC to your workspace. It produces the same result as the [`databricks-ncc` Terraform stack](../infra/terraform/databricks-ncc/), without Terraform or `scripts/automate.py`. For the scripted version, see [NCC Terraform setup](setup-ncc-terraform.md).
+This guide creates the Databricks side of the private path by hand: an NCC, a private endpoint rule for the Aura Private Link service, and the binding that attaches the NCC to your workspace. For the scripted version, see [NCC Terraform setup](setup-ncc-terraform.md).
 
 Use this path when the consumer is **Azure Databricks Serverless**. Serverless compute lives in Databricks-managed subscriptions, so the only supported private-network path is an NCC plus a private endpoint rule. Databricks creates and manages the private endpoint and its DNS. For classic Databricks, AKS, ADF, or jump VMs, see [Private Link manual setup](setup-private-link-manual.md).
 
@@ -138,6 +138,15 @@ databricks --profile "$ACCOUNT_PROFILE" account network-connectivity list-networ
 
 ## Step 2: Attach the NCC to the workspace
 
+A workspace holds one NCC at a time. The attach call replaces any NCC the workspace already has. Check the current one first:
+
+```bash
+databricks --profile "$ACCOUNT_PROFILE" account workspaces get "$WORKSPACE_ID" -o json \
+  | jq -r .network_connectivity_config_id
+```
+
+Then attach the new NCC:
+
 ```bash
 databricks --profile "$ACCOUNT_PROFILE" account workspaces update "$WORKSPACE_ID" \
   --network-connectivity-config-id "$NCC_ID"
@@ -152,16 +161,11 @@ The command waits for the workspace to return to `RUNNING`. Add `--no-wait` to r
 3. In **Network connectivity configurations**, select your NCC
 4. Click **Update**
 
-A workspace holds one NCC at a time. This call replaces any NCC the workspace already has. Check the current one first:
-
-```bash
-databricks --profile "$ACCOUNT_PROFILE" account workspaces get "$WORKSPACE_ID" -o json \
-  | jq -r .network_connectivity_config_id
-```
-
 **Wait 10 minutes** after the attach for the change to propagate. Then **restart any running serverless services** in the workspace.
 
 ## Step 3: Create the private endpoint rule
+
+A private endpoint rule tells Databricks to open a private connection from its serverless network to the Aura Private Link service. The rule names that service by its alias and lists the Aura hostname. Serverless compute then resolves that hostname to the private endpoint instead of the public address, so Bolt traffic stays on the Azure backbone. The rule starts as `PENDING` and becomes usable after you approve the connection in Aura in [Step 4](#step-4-approve-the-endpoint-in-aura).
 
 > **Use the CLI, REST API, or Terraform, not the account console UI.** The console requires an Azure-native resource ID and subresource ID. Neo4j Aura is a **third-party Private Link service**, so the console flow does not apply.
 
@@ -241,7 +245,7 @@ An NCC private endpoint rule that stays `PENDING`, `REJECTED`, or `DISCONNECTED`
 
 ## Step 5: Check the rule status
 
-Terraform has no equivalent of this step. Poll the rule until it reads `ESTABLISHED`:
+Poll the rule until it reads `ESTABLISHED`:
 
 ```bash
 databricks --profile "$ACCOUNT_PROFILE" account network-connectivity \
@@ -259,7 +263,7 @@ Restart running SQL warehouses and serverless jobs so they pick up the NCC-manag
 
 ## Add a routing hostname later
 
-Aura VDC can return Bolt routing addresses such as `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io`. The repository notebooks install a driver resolver that maps these hosts back to the instance host, so they pass without this step. A client without such a resolver fails with `Cannot resolve address p-...neo4j.io:7687`. Your own jobs and apps fall in this group. The error names the host. Add that host to the rule's `domain_names` by its full name. Terraform does this when you set `aura_extra_domain_names` and apply again.
+Aura VDC can return Bolt routing addresses such as `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io`. The repository notebooks install a driver resolver that maps these hosts back to the instance host, so they pass without this step. A client without such a resolver fails with `Cannot resolve address p-...neo4j.io:7687`. Your own jobs and apps fall in this group. The error names the host. Add that host to the rule's `domain_names` by its full name.
 
 The CLI update call replaces the rule's whole `domain_names` list. Include the instance host and every routing host, not only the new entry. The update mask is the third positional argument:
 
@@ -331,18 +335,11 @@ The notebooks install a driver resolver for the `p-<aura-instance-id>-*.neo4j.io
 
 ### Debug DNS (optional)
 
-Run this from a serverless notebook only if a notebook fails and you need to see which hostname is not resolving privately:
+Run the last cell of [ncc-notebooks/01_validate_connectivity.py](../ncc-notebooks/01_validate_connectivity.py) only if a notebook fails and you need to see which hostname is not resolving privately. The cell prints each host with its IP and labels it `private` or `PUBLIC`. It prints `UNRESOLVED` when the lookup fails. It does not affect the pass or fail result of the notebook.
 
-```python
-import socket
-for host in [
-    "<aura-instance-id>.databases.neo4j.io",                # replace <aura-instance-id> with your Aura instance id
-    "p-<aura-instance-id>-<suffix>.<orch>.neo4j.io",        # routing hostname named in a client's error
-]:
-    print(host, socket.gethostbyname(host))                 # should return a 10.x or similar private IP
-```
+The cell always checks the instance host from the `uri` secret. To check a routing hostname too, add `ROUTING_HOST` to `.env` and run `./scripts/create-secret-scope.sh` again. The script stores it as the `routing_host` secret, and the cell reads it from there. The `.env` value is the full `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io` hostname named in a client's error.
 
-The notebooks map `p-*.neo4j.io` routing hostnames to the instance host, so they never report an unresolved one. Use this snippet to check a routing hostname directly.
+The notebooks map `p-*.neo4j.io` routing hostnames to the instance host, so they never report an unresolved one. This cell checks a routing hostname directly.
 
 If a hostname resolves to a public IP or not at all, see [Troubleshooting](operations/troubleshooting.md).
 

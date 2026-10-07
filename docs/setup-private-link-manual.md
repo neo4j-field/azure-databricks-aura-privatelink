@@ -92,7 +92,7 @@ source scripts/load-env.sh
 | `RG` | Resource group that will hold the private endpoint and the private DNS zone | Your choice. Use `VNET_RG` unless your team keeps networking resources elsewhere. |
 | `PE_SUBNET` | Name of a subnet in `VNET` for the private endpoint | Azure portal, the VNet, **Subnets**. Pick a subnet that is not delegated, or create a new one. |
 
-**What the script fills in for you.** With Option A you only have to set `AURA_PLS_ALIAS` in `.env`. The script discovers the rest when a value is missing, and prints what it found so you can copy it into `.env`. Option B has no discovery, so set every value yourself:
+**What the script fills in for you.** With Option A you only have to set `AURA_PLS_ALIAS` in `.env`. The script discovers the rest when a value is missing, and prints what it found so you can copy it into `.env`. Option B has no discovery. The loader fills in only `AURA_INSTANCE_ID` from `NEO4J_URI`, `VNET_RG` from `RG`, and `ZONE`, so set every other value yourself. This is how the script finds each one:
 
 | Variable | How the script finds it |
 |----------|-------------------------|
@@ -479,7 +479,7 @@ Open the `neo4j-privatelink-pl` folder in the workspace to see the four notebook
 
 The notebooks must run on a classic cluster, because only classic compute runs in your VNet. Serverless compute does not, so it cannot reach the private endpoint. A single-node cluster is enough. It costs money while it runs, so the command sets it to stop after 30 minutes idle.
 
-List the Long Term Support runtime versions and pick one. The notebooks were tested on `16.4.x-scala2.12`. Then confirm the node type exists in your region:
+The loader sets `SPARK_VERSION` to `16.4.x-scala2.12`, the runtime the notebooks were tested on. To use another one, set `SPARK_VERSION` in `.env` and load it again. List the Long Term Support runtime versions to check that yours is available. Then confirm the node type exists in your region:
 
 ```bash
 databricks --profile "$WORKSPACE_PROFILE" clusters spark-versions -o json | jq -r '.versions[] | select(.name | test("LTS")) | select(.key | test("ml|gpu|photon|aarch64") | not) | .key' | sort -V
@@ -491,7 +491,6 @@ The second command must print `Standard_DS3_v2`. If it prints nothing, pick anot
 Create the cluster and save its ID:
 
 ```bash
-export SPARK_VERSION="16.4.x-scala2.12"
 export CLUSTER_ID=$(databricks --profile "$WORKSPACE_PROFILE" clusters create --no-wait --json "{
   \"cluster_name\": \"pl-test\",
   \"spark_version\": \"$SPARK_VERSION\",
@@ -558,6 +557,13 @@ source scripts/load-env.sh
 echo "$ORCH_ZONE $ROUTING_LABEL"
 ```
 
+The commands below also use `PE_IP` and `VNET_ID`. The loader does not set them, so read them again if you are in a new terminal:
+
+```bash
+export PE_IP=$(az network nic show --ids "$(az network private-endpoint show --resource-group "$RG" --name "$PE_NAME" --query 'networkInterfaces[0].id' -o tsv)" --query 'ipConfigurations[0].privateIPAddress' -o tsv)
+export VNET_ID="$(az network vnet show --resource-group "$VNET_RG" --name "$VNET" --query id -o tsv)"
+```
+
 Create the zone and link it to the same VNet:
 
 ```bash
@@ -584,7 +590,7 @@ az network private-dns record-set a add-record \
   --ipv4-address "$PE_IP"
 ```
 
-Repeat the record commands for every routing host a client reports. Set `ROUTING_HOST` and `ROUTING_LABEL` again for each host. The zone and link are created once. A linked zone answers for the whole `<orch>.neo4j.io` domain, so any host in that domain without a record stops resolving from linked VNets.
+Repeat the record commands for every routing host a client reports. For each host, change `ROUTING_HOST` in `.env` and load it again. The loader derives `ORCH_ZONE` and `ROUTING_LABEL` anew. The zone and link are created once. A linked zone answers for the whole `<orch>.neo4j.io` domain, so any host in that domain without a record stops resolving from linked VNets.
 
 Do not use a `p-*` record. An Azure private DNS wildcard must be the whole label `*`, so `p-*` matches nothing. A `*` record would point every host under that domain at your endpoint, so add one record per host instead.
 

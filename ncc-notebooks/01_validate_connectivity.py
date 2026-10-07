@@ -125,3 +125,28 @@ print(f"Connected successfully. Current node count: {node_count}")
 
 driver.close()
 print("Validation complete. NCC private path is working end-to-end.")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 5. Debug DNS (optional)
+# MAGIC
+# MAGIC Run this cell only if a check above fails or a client reports an unresolved host.
+# MAGIC It does not affect the pass/fail result. To check a routing host, set `ROUTING_HOST`
+# MAGIC in `.env` and re-run `scripts/create-secret-scope.sh`. The cell then reads it from the
+# MAGIC `routing_host` secret.
+
+# COMMAND ----------
+
+debug_hosts = [host]
+if "routing_host" in SECRET_KEYS:
+    debug_hosts.append(dbutils.secrets.get(scope="neo4j", key="routing_host"))
+
+for debug_host in debug_hosts:
+    try:
+        debug_ip = socket.gethostbyname(debug_host)
+    except socket.gaierror as err:
+        print(f"{debug_host} -> UNRESOLVED ({err})")
+        continue
+    kind = "private" if ipaddress.ip_address(debug_ip).is_private else "PUBLIC"
+    print(f"{debug_host} -> {debug_ip} ({kind})")

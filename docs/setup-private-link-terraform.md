@@ -207,11 +207,11 @@ The notebooks in `pl-notebooks/` run on classic clusters in a VNet-injected work
 ./scripts/create-secret-scope.sh
 ```
 
-**Upload the notebooks.** Run this from the repository root. It copies the notebooks into a `neo4j-privatelink` folder in your user area of the workspace:
+**Upload the notebooks.** Run this from the repository root. It copies the notebooks into a `neo4j-privatelink-pl` folder in your user area of the workspace:
 
 ```bash
 : "${WORKSPACE_PROFILE:?WORKSPACE_PROFILE is not set}"
-export NOTEBOOK_DIR="/Users/$(databricks --profile "$WORKSPACE_PROFILE" current-user me -o json | jq -r .userName)/neo4j-privatelink"
+export NOTEBOOK_DIR="/Users/$(databricks --profile "$WORKSPACE_PROFILE" current-user me -o json | jq -r .userName)/neo4j-privatelink-pl"
 databricks --profile "$WORKSPACE_PROFILE" workspace mkdirs "$NOTEBOOK_DIR"
 for f in pl-notebooks/0*.py; do
   databricks --profile "$WORKSPACE_PROFILE" workspace import "$NOTEBOOK_DIR/$(basename "$f" .py)" \
@@ -219,7 +219,7 @@ for f in pl-notebooks/0*.py; do
 done
 ```
 
-Open the `neo4j-privatelink` folder in the workspace and attach each notebook to a classic cluster instead of serverless compute.
+Open the `neo4j-privatelink-pl` folder in the workspace and attach each notebook to a classic cluster instead of serverless compute.
 
 **Restart running clusters after DNS changes.** A cluster that resolved the host before the record existed can keep the public answer cached. Restart it after you create or change any A record or zone link.
 

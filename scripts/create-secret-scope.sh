@@ -10,7 +10,7 @@
 #     --azure-keyvault <kv-resource-id> --azure-keyvault-dns-name <kv-dns>
 #
 # Usage:
-#   cp env.sample .env      # then fill in the values
+#   [ -f .env ] || cp env.sample .env   # then fill in the values
 #   ./scripts/create-secret-scope.sh
 #
 # Values are read from the repo-root .env (override the path with ENV_FILE).
@@ -18,6 +18,7 @@
 #
 # Required: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD
 # Optional: NEO4J_DATABASE (defaults to neo4j)
+#           ROUTING_HOST (stored as routing_host, for the debug DNS cell in notebook 01)
 # Workspace: WORKSPACE_PROFILE (a Databricks CLI profile), or DATABRICKS_HOST
 #            and DATABRICKS_TOKEN
 
@@ -83,6 +84,10 @@ put "uri"      "${NEO4J_URI}"
 put "username" "${NEO4J_USERNAME}"
 put "password" "${NEO4J_PASSWORD}"
 put "database" "${NEO4J_DATABASE}"
+# Databricks rejects empty secret values, so skip this key when it is unset.
+if [[ -n "${ROUTING_HOST:-}" ]]; then
+  put "routing_host" "${ROUTING_HOST}"
+fi
 
 echo
 echo "Done. Verify with:"

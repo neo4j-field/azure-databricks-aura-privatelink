@@ -67,6 +67,38 @@ The Aura console has no API, so its steps are manual in every path. They are col
 
 ---
 
+## How NCC works
+
+An NCC gives Databricks Serverless a private path to Aura. Serverless compute runs in Databricks-owned subscriptions, so it cannot join your VNet. Databricks builds the private endpoint for you and answers DNS for the hostnames you list.
+
+The Bolt driver adds one more step. After the first connection, the driver asks Aura for a routing table. It then connects to the hosts in that table. Those hosts need a private path too.
+
+![Sequence diagram. The driver looks up the Aura instance host through NCC DNS and connects over the NCC private endpoint. Aura returns a routing table with p- routing hosts. A driver resolver rewrites them to the instance host, so later connections use the same private endpoint. Without the resolver, the lookup of a routing host fails.](docs/images/ncc-routing-flow.svg)
+
+### Key terms
+
+- **NCC:** An NCC is a Databricks account setting. You attach it to a workspace, and serverless compute in that workspace follows its rules.
+- **Private endpoint rule:** A private endpoint rule is an entry in the NCC. It names the Aura Private Link service and a list of hostnames. Databricks creates a private endpoint from it, and you approve that endpoint in Aura.
+- **domain_names:** `domain_names` is the hostname list in the rule. Serverless DNS returns the private endpoint address only for names on this list. Each name is exact. Databricks says to enter the specific instance name, not a wildcard domain.
+- **Private ingress:** The private ingress is the Neo4j side of the path. It reads the instance ID from the hostname in the TLS handshake and sends the connection to that instance.
+- **Routing table:** The routing table is a list of servers that Aura sends to the driver. It names the servers for reads, writes, and routing. The driver refreshes the table when its time-to-live ends or when the table looks out of date. The hosts in it can therefore change.
+- **Routing host:** A routing host is a server name from the routing table. On Aura VDC it looks like `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io`. It differs from the instance host, so the rule does not cover it until you add it.
+
+### Two ways to cover routing hosts
+
+- **Add the host to domain_names:** Use this fix for your own jobs and apps. The error `Cannot resolve address p-...` names the missing host. The update call replaces the whole list, so send every host. See [Add a routing hostname later](docs/setup-ncc-manual.md#add-a-routing-hostname-later).
+- **Use a driver resolver:** The notebooks in `ncc-notebooks/` use this fix. A resolver is a driver setting that rewrites an address before DNS runs. The notebooks rewrite each `p-<aura-instance-id>-*` host to the instance host. The driver then sends the instance host in the TLS handshake, and the ingress routes it to the instance.
+
+### Good to know
+
+- **Why the resolver works:** The Neo4j Python driver runs the resolver on every address it opens, including the addresses from the routing table. The TLS server name comes from the resolver output, so it matches the instance host. This was checked in the source of driver 5.28.7.
+- **Trade-off:** With the resolver, every connection goes to the instance host. The driver no longer picks a specific reader or writer, and Aura decides which server answers. Neo4j does not document that choice for this case, so test your write workload.
+- **Delay:** Rule changes reach serverless compute within about 10 minutes. They can take up to 24 hours to apply fully. Restart serverless compute after each change.
+
+More detail is in [Architecture](docs/architecture.md#routing-hosts-on-both-paths). Sources: [Neo4j routing](https://neo4j.com/docs/operations-manual/current/clustering/setup/routing/), [Aura private link flow](https://neo4j.com/docs/aura/security/secure-connections/), [Databricks domain names](https://learn.microsoft.com/en-us/azure/databricks/security/network/serverless-network-security/pl-to-internal-network), and [Databricks rule updates](https://learn.microsoft.com/en-us/azure/databricks/security/network/serverless-network-security/manage-private-endpoint-rules).
+
+---
+
 ## What's next
 
 | Topic | Guide |

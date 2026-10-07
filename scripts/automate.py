@@ -9,8 +9,7 @@
 """
 automate.py - orchestrate the Databricks Serverless + Neo4j Aura Private Link setup.
 
-This is the Phase 1 orchestrator described in automate-v2.md. It drives the
-`databricks-ncc` Terraform stack and fills the runtime gaps that Terraform and
+It drives the `databricks-ncc` Terraform stack and fills the runtime gaps that Terraform and
 the standalone helper scripts do not cover: polling the NCC private endpoint
 rule to ESTABLISHED, restarting running SQL warehouses so they pick up
 NCC-managed DNS, populating the `neo4j` secret scope, and running a validation
@@ -26,16 +25,17 @@ Auth uses the Databricks SDK with CLI-profile OAuth:
   - --account-profile targets https://accounts.azuredatabricks.net (NCC rule status)
   - --workspace-profile targets the workspace URL (secrets, jobs, warehouses)
 
-Configure the account profile once (Phase 1 prerequisite):
+Configure the account profile once:
   databricks auth login --host https://accounts.azuredatabricks.net --account-id <account-id> --profile <name>
 
 Aura credentials come from the repo-root .env (loaded at startup via python-dotenv):
   NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD, and optional NEO4J_DATABASE (default neo4j).
+The workspace profile defaults to WORKSPACE_PROFILE from the same file.
 Real environment variables, if set, take precedence over the .env file.
 
 Usage:
   cd <repo-root>
-  uv run scripts/automate.py run --account-profile <name> [--workspace-profile azure-rk-knight]
+  uv run scripts/automate.py run --account-profile <name> [--workspace-profile <name>]
 
 `run` flags:
   --no-apply                Skip `terraform apply`; only read `terraform output -json`.
@@ -86,7 +86,7 @@ SUBSCRIPTION_PATH_RE = re.compile(
     r"/subscriptions/([0-9a-fA-F-]{36})/resourceGroups/(prod-[\w-]+)"
 )
 
-# Neo4j Aura VDC advertises Bolt routing hosts like p-<dbid>-....neo4j.io after
+# Neo4j Aura VDC advertises Bolt routing hosts like p-<aura-instance-id>-....neo4j.io after
 # the first connection. If those do not resolve through NCC DNS the driver
 # raises "Cannot resolve address p-...neo4j.io:7687".
 ROUTING_HOST_RE = re.compile(
@@ -536,12 +536,16 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="Drive the setup to a passing validation run (re-entrant).")
     run.add_argument(
         "--account-profile",
+        required=True,
         help="Databricks CLI profile for the account console (accounts.azuredatabricks.net).",
     )
+    workspace_profile = os.environ.get("WORKSPACE_PROFILE")
     run.add_argument(
         "--workspace-profile",
-        default="azure-rk-knight",
-        help="Databricks CLI profile for the target workspace (default: azure-rk-knight).",
+        default=workspace_profile,
+        required=not workspace_profile,
+        help="Databricks CLI profile for the target workspace "
+        "(default: WORKSPACE_PROFILE from .env).",
     )
     run.add_argument(
         "--no-apply",

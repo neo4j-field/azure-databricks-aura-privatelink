@@ -6,8 +6,12 @@ Pick the guide that matches what reaches Aura and how you want to run it.
 
 | Connecting from | Manual | Terraform |
 |-----------------|--------|-----------|
-| **Databricks Serverless** (NCC) | [setup-ncc-manual.md](setup-ncc-manual.md) | [setup-ncc-terraform.md](setup-ncc-terraform.md) |
-| **Your VNet** (Private Link) | [setup-private-link-manual.md](setup-private-link-manual.md) | [setup-private-link-terraform.md](setup-private-link-terraform.md) |
+| **Databricks Serverless** (NCC) | [NCC manual setup](setup-ncc-manual.md) | [NCC Terraform setup](setup-ncc-terraform.md) |
+| **Your VNet** (Private Link) | [Private Link manual setup](setup-private-link-manual.md) | [Private Link Terraform setup](setup-private-link-terraform.md) |
+
+Every guide ends with the same follow-up steps: validate connectivity, close the public endpoint, teardown, and what's next. The NCC guides and the Private Link Terraform guide give each step its own section. The Private Link manual guide groups them under [After setup: what comes next for both options](setup-private-link-manual.md#after-setup-what-comes-next-for-both-options), with an extra step to add routing-host records.
+
+The guides call the two paths NCC and Private Link. The Terraform folders for them are the **NCC stack** (`databricks-ncc`) and the **Private Endpoint stack** (`azure-private-endpoint`).
 
 Read [architecture.md](architecture.md) first if you want the data-plane, control-plane, and DNS background.
 
@@ -16,7 +20,7 @@ Read [architecture.md](architecture.md) first if you want the data-plane, contro
 | Doc | Covers |
 |-----|--------|
 | [shared/aura-console-steps.md](shared/aura-console-steps.md) | Provision Aura, enable Private Link, allow-list the consumer subscription, approve the endpoint, disable public access |
-| [shared/validate-connectivity.md](shared/validate-connectivity.md) | Secret scope, notebook upload, validation and smoke test notebooks |
+| [shared/private-dns-central.md](shared/private-dns-central.md) | Why `databases.neo4j.io` lives in your private DNS zone, self-managed vs. central DNS, and central hub DNS setup for Private Link |
 
 ## Operations
 

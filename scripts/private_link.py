@@ -12,7 +12,7 @@ private DNS so the Aura hostname resolves to the endpoint NIC. Every `az` call i
 printed to stderr, so the output doubles as a transcript of the manual steps.
 
 It matches the single-VNet mode of the Terraform stack (`manage_private_dns = true`).
-For a central hub DNS, follow docs/setup-private-link-terraform.md instead.
+For a central hub DNS, follow docs/shared/private-dns-central.md instead.
 
 Auth is the Azure CLI session:
   az login --tenant <tenant-id>
@@ -27,9 +27,11 @@ Commands:
   create             Create the private endpoint (doc Step 2).
   status [--wait]    Show the connection state and endpoint IP (doc Step 4).
   dns                Create the zone, VNet link, zone group, and A record (doc Steps 5, 6).
-  add-routing-host   Add an A record for a p-<dbid>-<suffix>.<orch>.neo4j.io host.
+  add-routing-host   Add an A record for a p-<aura-instance-id>-<suffix>.<orch>.neo4j.io host.
   verify             Compare DNS records to the endpoint IP. Add --vm NAME to resolve
                      from a VM, and --bolt to run a connectivity test with neo4j-cli.
+                     It checks the zones this script's link names mark, so it covers
+                     the single-VNet mode only.
   run                create, wait for the Aura approval, then dns.
   destroy            Delete the endpoint and the DNS objects this script created.
 
@@ -38,10 +40,10 @@ exists and what would be created, updated, or deleted:
   OK      exists and correct         CREATE  would be created
   UPDATE  exists but differs         DELETE  would be deleted
   WAIT    waiting on the Aura console   CHECK   cannot be judged until the endpoint exists
-  ERROR   blocks the setup
+  KEEP    kept, another link uses it    ERROR   blocks the setup
 
-Exit codes: 0 done, 1 error or failed check, 2 paused on a human step in the Aura
-console. Run again after the step.
+Exit codes: 0 done, 1 error or failed check (a dry run with an ERROR row included),
+2 paused on a human step in the Aura console. Run again after the step.
 
 Usage:
   uv run scripts/private_link.py run --dry-run
@@ -448,12 +450,12 @@ def setup_dns(s: Settings) -> None:
 
 
 def split_routing_host(host: str) -> tuple[str, str]:
-    """Split p-<dbid>-<suffix>.<orch>.neo4j.io into (record label, zone)."""
+    """Split p-<aura-instance-id>-<suffix>.<orch>.neo4j.io into (record label, zone)."""
     label, _, zone = host.strip().rstrip(".").partition(".")
     if not label or not zone.endswith(".neo4j.io") or zone == ZONE:
         raise SystemExit(
             f"error: {host} is not a routing host. Expected "
-            "p-<dbid>-<suffix>.<orch>.neo4j.io, not under databases.neo4j.io."
+            "p-<aura-instance-id>-<suffix>.<orch>.neo4j.io, not under databases.neo4j.io."
         )
     return label, zone
 
@@ -648,7 +650,9 @@ def dry_run_summary() -> None:
     banner("Dry run summary")
     counts = Counter(state for state, _ in PLAN)
     info(", ".join(f"{n} {state}" for state, n in sorted(counts.items())))
-    if CHANGING & set(counts):
+    if "ERROR" in counts:
+        info("Nothing was changed. Fix the ERROR lines above, then run again.")
+    elif CHANGING & set(counts):
         info("Nothing was changed. Run again without --dry-run to apply it.")
     else:
         info("Nothing to do. The setup matches.")
@@ -713,7 +717,6 @@ def cmd_run(args: argparse.Namespace, s: Settings) -> int:
     if not preflight(s):
         if not DRY_RUN:
             raise AzError("preflight failed, fix the ERROR lines above")
-        dry_run_summary()
         return 0
     endpoint = create_endpoint(s)
     banner("2. Aura approval")
@@ -758,7 +761,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=env("REQUEST_MESSAGE", "Neo4j Aura Private Link"),
         help="shown on the Aura approval screen",
     )
-    common.add_argument(
+
+    dry = argparse.ArgumentParser(add_help=False)
+    dry.add_argument(
         "--dry-run",
         action="store_true",
         help="change nothing, show what exists and what would change",
@@ -769,13 +774,13 @@ def build_parser() -> argparse.ArgumentParser:
     wait.add_argument("--interval", type=int, default=15, help="seconds between polls")
 
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("create", parents=[common]).set_defaults(func=cmd_create)
+    sub.add_parser("create", parents=[common, dry]).set_defaults(func=cmd_create)
     p = sub.add_parser("status", parents=[common, wait])
     p.add_argument("--wait", action="store_true", help="wait for Approved")
     p.set_defaults(func=cmd_status)
-    sub.add_parser("dns", parents=[common]).set_defaults(func=cmd_dns)
-    p = sub.add_parser("add-routing-host", parents=[common])
-    p.add_argument("host", help="p-<dbid>-<suffix>.<orch>.neo4j.io")
+    sub.add_parser("dns", parents=[common, dry]).set_defaults(func=cmd_dns)
+    p = sub.add_parser("add-routing-host", parents=[common, dry])
+    p.add_argument("host", help="p-<aura-instance-id>-<suffix>.<orch>.neo4j.io")
     p.set_defaults(func=cmd_add_routing_host)
     p = sub.add_parser("verify", parents=[common])
     p.add_argument("--vm", help="resolve each host from this VM via run-command")
@@ -785,15 +790,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bolt-credential", help="neo4j-cli stored credential name")
     p.add_argument("--bolt-env", help="path to a .env file with NEO4J_USERNAME and NEO4J_PASSWORD")
     p.set_defaults(func=cmd_verify)
-    sub.add_parser("run", parents=[common, wait]).set_defaults(func=cmd_run)
-    sub.add_parser("destroy", parents=[common]).set_defaults(func=cmd_destroy)
+    sub.add_parser("run", parents=[common, wait, dry]).set_defaults(func=cmd_run)
+    sub.add_parser("destroy", parents=[common, dry]).set_defaults(func=cmd_destroy)
     return parser
 
 
 def main() -> int:
     global DRY_RUN
     args = build_parser().parse_args()
-    DRY_RUN = args.dry_run
+    DRY_RUN = getattr(args, "dry_run", False)
     settings = Settings(
         resource_group=args.resource_group,
         vnet=args.vnet,
@@ -812,8 +817,10 @@ def main() -> int:
     except AzError as err:
         print(f"\nERROR\n  {err}", file=sys.stderr)
         return 1
-    if DRY_RUN and args.command != "verify" and PLAN:
+    if DRY_RUN and PLAN:
         dry_run_summary()
+        if any(state == "ERROR" for state, _ in PLAN):
+            return 1
     return code
 
 

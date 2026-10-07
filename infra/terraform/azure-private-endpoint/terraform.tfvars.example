@@ -21,16 +21,16 @@ pe_subnet_name           = "REPLACE_WITH_PE_SUBNET_NAME"      # e.g., snet-priva
 # It is a hint, not enforced. Keep it lowercase and hyphen-delimited.
 private_endpoint_name = "REPLACE_WITH_PE_NAME"
 
-# Aura targets — from the Aura console (see docs/shared/aura-console-steps.md Step 2).
-aura_pls_alias   = "REPLACE_WITH_AURA_PLS_ALIAS"              # e.g., production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
-aura_instance_id = "REPLACE_WITH_AURA_INSTANCE_ID"            # the dbid, e.g., abcd1234
+# Aura targets, from the Aura console (see docs/shared/aura-console-steps.md Step 2).
+aura_pls_alias   = "REPLACE_WITH_AURA_PLS_ALIAS"              # e.g., production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice
+aura_instance_id = "REPLACE_WITH_AURA_INSTANCE_ID"            # the <aura-instance-id> label, e.g., abcd1234
 
 # Create the `databases.neo4j.io` private DNS zone + VNet link + A record in
 # this stack. Set to false if you manage DNS centrally (e.g., hub-and-spoke
 # Azure Private DNS Resolver) and want to wire the zone yourself.
 manage_private_dns = true
 
-# Shown on the Aura approval screen — make it identifying so the Aura admin
+# Shown on the Aura approval screen. Make it identifying so the Aura admin
 # can match the request to your team.
 connection_request_message = "Neo4j Aura PrivateLink from <team> / <subscription nickname>"
 

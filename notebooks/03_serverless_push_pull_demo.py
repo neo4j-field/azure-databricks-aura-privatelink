@@ -31,7 +31,12 @@ from pyspark.sql import functions as F
 NEO4J_URI      = dbutils.secrets.get(scope="neo4j", key="uri")
 NEO4J_USER     = dbutils.secrets.get(scope="neo4j", key="username")
 NEO4J_PASSWORD = dbutils.secrets.get(scope="neo4j", key="password")
-NEO4J_DATABASE = "neo4j"
+SECRET_KEYS    = {s.key for s in dbutils.secrets.list("neo4j")}
+NEO4J_DATABASE = (
+    dbutils.secrets.get(scope="neo4j", key="database")
+    if "database" in SECRET_KEYS
+    else "neo4j"
+)
 
 DEMO_LABEL = "DemoCustomer"
 ROWS       = 20
@@ -65,7 +70,7 @@ display(push_df)
 # COMMAND ----------
 
 def make_resolver(uri):
-    # Aura VDC advertises p-<dbid>-*.neo4j.io routing hosts that do not resolve on
+    # Aura VDC advertises p-<aura-instance-id>-*.neo4j.io routing hosts that do not resolve on
     # Databricks serverless. Map them to the private Aura host that NCC resolves.
     host = urlparse(uri).hostname
     pattern = re.compile(rf"^p-{re.escape(host.split('.')[0])}-.*\.neo4j\.io$")

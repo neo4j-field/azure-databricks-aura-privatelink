@@ -15,7 +15,7 @@
   <text x="290.0" y="147.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Batch VM / AKS node / ADF IR</text>
   <text x="290.0" y="167.5" font-size="10" fill="#5C6470" text-anchor="middle">workload in the batch VNet</text>
   <path d="M290,185 V229" fill="none" stroke="#C42B12" stroke-width="1.8" marker-end="url(#arrow-red)"/>
-  <text x="302" y="212" font-size="10" fill="#16233A">DNS: &lt;dbid&gt;.databases.neo4j.io</text>
+  <text x="302" y="212" font-size="10" fill="#16233A">DNS: &lt;aura-instance-id&gt;.databases.neo4j.io</text>
   <rect x="80" y="232" width="420" height="76" rx="10" fill="#FDF2EF" stroke="#C42B12" stroke-width="1.5"/>
   <text x="290.0" y="267.5" font-size="13" fill="#C42B12" text-anchor="middle" font-weight="bold">Public DNS answers 52.x.x.x</text>
   <text x="290.0" y="287.5" font-size="10" fill="#A8776C" text-anchor="middle">Aura refuses the connection</text>
@@ -23,7 +23,7 @@
   <text x="810.0" y="147.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Your app VMs</text>
   <text x="810.0" y="167.5" font-size="10" fill="#5C6470" text-anchor="middle">workload in the consumer VNet</text>
   <path d="M810,185 V229" fill="none" stroke="#2E8B57" stroke-width="1.8" marker-end="url(#arrow-green)"/>
-  <text x="822" y="212" font-size="10" fill="#16233A">DNS: &lt;dbid&gt;.databases.neo4j.io</text>
+  <text x="822" y="212" font-size="10" fill="#16233A">DNS: &lt;aura-instance-id&gt;.databases.neo4j.io</text>
   <rect x="600" y="232" width="420" height="76" rx="10" fill="#EDF7F1" stroke="#2E8B57" stroke-width="1.5"/>
   <text x="810.0" y="267.5" font-size="13" fill="#1E6B41" text-anchor="middle" font-weight="bold">Private DNS zone answers 10.x.x.x</text>
   <text x="810.0" y="287.5" font-size="10" fill="#5C8B6F" text-anchor="middle">the zone is linked to this VNet</text>

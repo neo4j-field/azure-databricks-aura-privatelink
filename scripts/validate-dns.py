@@ -7,7 +7,7 @@ to confirm that the Aura Private URI resolves to a private IP via the
 NCC-managed DNS.
 
 Usage:
-    python validate-dns.py <aura-id>.databases.neo4j.io
+    python validate-dns.py <aura-instance-id>.databases.neo4j.io
 """
 
 import ipaddress

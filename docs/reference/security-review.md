@@ -2,7 +2,25 @@
 
 Review date: 2026-10-06
 
-File paths and line numbers in this review refer to the repo layout at the time of the review. Docs have since moved. For example, `docs/manual-ncc-setup.md` is now `docs/setup-ncc-manual.md`, and README Steps 1, 2, 7, and 9 are now in `docs/shared/aura-console-steps.md`.
+File paths and line numbers in this review refer to the repo layout at the time of the review. Docs have since moved. Use this table to find the current location:
+
+| Old location | Current location |
+|--------------|------------------|
+| `docs/manual-ncc-setup.md` | `docs/setup-ncc-manual.md` |
+| `docs/automate-tf-ncc-setup.md` | `docs/setup-ncc-terraform.md` |
+| `docs/private-link-manual-setup.md` | `docs/setup-private-link-manual.md` |
+| `docs/private-endpoint-stack-setup.md` | `docs/setup-private-link-terraform.md` |
+| `docs/teardown.md`, `docs/troubleshooting.md`, `docs/batch-jobs-other-vnets.md`, `docs/developer-desktop-access.md` | Same names under `docs/operations/` |
+| `docs/validation-report.md`, `docs/security-review.md`, `docs/suggest-improvements.md` | Same names under `docs/reference/` |
+| README Steps 0, 3, 4, and 5 | `docs/setup-ncc-manual.md` |
+| README Step 1: provision Aura | `docs/shared/aura-console-steps.md` Step 1 |
+| README Step 2: enable Private Link | `docs/shared/aura-console-steps.md` Step 2 |
+| README Step 6: add the private endpoint rule, including the curl example | `docs/setup-ncc-manual.md` Step 3 and its REST alternative |
+| README Step 6: allow-list the Databricks-managed subscription | `docs/shared/aura-console-steps.md` Step 3 |
+| README Step 7: approve the endpoint | `docs/shared/aura-console-steps.md` Step 4 |
+| README Step 8: validate | `docs/setup-ncc-manual.md`, Validate connectivity |
+| README Step 9: disable public access | `docs/shared/aura-console-steps.md` Step 5 |
+| README production best practices and limitations | `docs/operations/production-notes.md` |
 
 ## Overview
 
@@ -124,6 +142,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 - **Fix:** Run `terraform plan -out`, print the summary, and apply that saved plan only after a `--yes` flag or a typed confirmation.
 - **Fix:** Remove the default profile. Require `--workspace-profile` and print the target account and workspace before any change.
 - **Fix:** Ask for confirmation before `delete_scope`.
+- **Status:** The default personal profile is removed. `--workspace-profile` now defaults to `WORKSPACE_PROFILE` from `.env`, and the run stops when neither is set. `--account-profile` is required. The saved-plan apply, the printed target, and the `delete_scope` confirmation are still open.
 
 ### M4. Tokens and passwords appear on command lines
 
@@ -241,6 +260,8 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 - **Fix:** List which paths are private and which are not.
 - **Fix:** Correct the DNS fallback statement after a test.
 - **Fix:** Correct the multi-instance advice in `docs/batch-jobs-other-vnets.md`. Running the stack again for a second instance creates a second `databases.neo4j.io` zone. Tell readers to add records to the existing zone.
+- **Status:** The multi-instance fix is done. `docs/operations/batch-jobs-other-vnets.md` now tells readers to add the second instance's A record to the existing zone by hand. A second instance that needs its own endpoint goes in a separate stack with `manage_private_dns = false`.
+- **Status:** The DNS fallback fix is done, based on Azure's documentation rather than a live test. `docs/architecture.md` and `docs/setup-private-link-manual.md` now say a missing record returns NXDOMAIN. They also say fallback to public DNS happens only with NxDomainRedirect on the VNet link. `docs/architecture.md` no longer calls the control plane private. It says Databricks manages the control plane and this setup does not cover it.
 
 ### L7. VPN guidance uses the manual app ID and a weak certificate fallback
 
@@ -266,8 +287,8 @@ These edits to `README.md` and `docs/manual-ncc-setup.md` are done. They are doc
 
 - **H1:** README Step 9 now says Private Link does not close the public endpoint. It adds an outside-in `nc` check. `docs/manual-ncc-setup.md` has a new Step 7 that points to it. The README Limitations table has a matching row.
 - **H2:** The README Limitations table and a new "What the NCC does not cover" section in `docs/manual-ncc-setup.md` say the NCC does not restrict other outbound traffic. The Terraform fix (T5) is still open.
-- **M7:** The README and the manual guide name routing hostnames in full form, `p-<aura-id>-<suffix>.<orch>.neo4j.io`, instead of `p-*.neo4j.io`.
-- **M8:** Both docs say to add only the subscription ID from your own failed call. Both say to approve within a day.
+- **M7:** The README and the manual guide name routing hostnames in full form, `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io`, instead of `p-*.neo4j.io`.
+- **M8:** Both docs say to add only the subscription ID from your own failed call. Both say to approve the request promptly. The 14-day expiry note now applies to NCC rules only.
 
 ## Recommendations by area
 
@@ -281,7 +302,7 @@ Each group lists the open work in severity order. The finding sections above hol
 - **M7:** Correct the wildcard advice in `docs/architecture.md` line 133.
 - **M8:** Match each pending request to the rule before approving. This needs Aura console access. Confirm with Databricks before removing allow-list entries.
 - **M10:** Update the service principal wording in the README, line 60, and `docs/automate-tf-ncc-setup.md`. This waits for T4, so it is deferred.
-- **L6:** Correct `docs/architecture.md` lines 53 and 108. Correct the multi-instance advice in `docs/batch-jobs-other-vnets.md`.
+- **L6:** Correct `docs/architecture.md` lines 53 and 108.
 - **L7:** Update `docs/developer-desktop-access.md` for the Microsoft-registered VPN app ID and Conditional Access.
 
 ### Terraform
@@ -297,7 +318,7 @@ These findings fit neither group above.
 - **M1:** Run `chmod 600` on `.env`, the tfvars file, and every state file.
 - **M2:** Replace the hardcoded Aura hostname and workspace name in `notebooks/04_smoke_test.py`. Turn on secret scanning and add pre-commit and CI checks.
 - **M3:** Plan before apply, remove the default `--workspace-profile`, and confirm before `delete_scope`.
-- **M4:** Pipe secret values on standard input in `scripts/create-secret-scope.sh`. Replace the raw bearer token in `scripts/create-private-endpoint-rule.sh`. The curl examples in README Step 6 and the REST section of `docs/manual-ncc-setup.md` use the same header pattern. They stay unchanged.
+- **M4:** Pipe secret values on standard input in `scripts/create-secret-scope.sh`. Replace the raw bearer token in `scripts/create-private-endpoint-rule.sh`. The curl examples in the REST alternative of `docs/setup-ncc-manual.md` Step 3 use the same header pattern. They stay unchanged.
 - **L3:** Import notebooks to a per-user folder and guard the `DETACH DELETE` demos.
 - **L4:** Compare DNS answers to the PE subnet in `scripts/validate-dns.py` and notebook 01.
 

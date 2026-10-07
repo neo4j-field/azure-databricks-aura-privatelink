@@ -15,7 +15,7 @@
   <text x="264.0" y="284.0" font-size="10" fill="#16233A">joined to the VNet</text>
   <rect x="60" y="300" width="380" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>
   <text x="250.0" y="332.5" font-size="13" fill="#16233A" text-anchor="middle" font-weight="bold">Private DNS zone</text>
-  <text x="250.0" y="352.5" font-size="10" fill="#5C6470" text-anchor="middle">&lt;dbid&gt;.databases.neo4j.io resolves to the PE NIC IP</text>
+  <text x="250.0" y="352.5" font-size="10" fill="#5C6470" text-anchor="middle">&lt;aura-instance-id&gt;.databases.neo4j.io resolves to the PE NIC IP</text>
   <path d="M250.0,373 V409" fill="none" stroke="#8A8A8A" stroke-width="1.8" marker-end="url(#arrow-gray)"/>
   <text x="264.0" y="394.0" font-size="10" fill="#16233A">resolves to a private IP</text>
   <rect x="60" y="410" width="380" height="70" rx="10" fill="#F1F1EE" stroke="#DAD7CE" stroke-width="1.5"/>

@@ -8,7 +8,7 @@ This repository provides validated step-by-step guides, Terraform, helper script
 
 ## Problem Statement
 
-Enterprise teams need to exchange data between Delta tables in Azure Databricks and Neo4j Aura graph databases without traversing the public internet. Public TLS endpoints with IP allowlists are operationally fragile (egress IPs change, allowlists drift) and not aligned with Zero Trust principles for regulated workloads.
+Enterprise teams need to exchange data between Delta tables in Azure Databricks and Neo4j Aura graph databases without traversing the public internet. Public TLS endpoints with IP allowlists are fragile to operate. Egress IPs change, and allowlists drift. They also fall short of Zero Trust principles for regulated workloads.
 
 This repository documents a private-only architecture that:
 
@@ -22,7 +22,7 @@ This repository documents a private-only architecture that:
 
 ![Databricks Serverless reaches Neo4j Aura through an NCC private endpoint and the Aura Private Link Service](docs/images/architecture-goal.svg)
 
-See [docs/architecture.md](docs/architecture.md) for a detailed walkthrough including the data-plane vs control-plane distinction and DNS routing behavior.
+The diagram shows the NCC path from Databricks Serverless. [docs/architecture.md](docs/architecture.md) walks through both paths, including the Private Link path from your own VNet. It also covers the data-plane vs control-plane distinction and DNS routing behavior. Console screenshots of both validated paths are in [screenshots/](screenshots/).
 
 ---
 
@@ -33,7 +33,8 @@ See [docs/architecture.md](docs/architecture.md) for a detailed walkthrough incl
 | Aura tier | **AuraDB Virtual Dedicated Cloud (VDC)** or **AuraDS Enterprise**, on Azure |
 | Aura role | Org admin on the Aura tenant |
 | Databricks (NCC paths) | **Premium** workspace and account, with an **Azure Databricks account admin** (workspace admin is not sufficient) |
-| Azure | `az login` as the account admin. For CI/CD, use a service principal with account admin. |
+| Azure (NCC paths) | `az login` as the Azure Databricks account admin. For CI/CD, use a service principal with account admin. |
+| Azure (Private Link paths) | `az login` as a user who can create private endpoints and private DNS zones in the target resource group. |
 
 > Private Link is **not available** on Aura Professional or Business Critical on Azure. Verify your tier before starting.
 
@@ -45,8 +46,8 @@ Pick the row that matches **what reaches Aura**, then the column that matches **
 
 | Connecting from | Manual | Terraform |
 |-----------------|--------|-----------|
-| **Databricks Serverless** (NCC) | [Manual NCC setup](docs/setup-ncc-manual.md) | [Terraform and automated NCC setup](docs/setup-ncc-terraform.md) |
-| **Your VNet**: classic Databricks, AKS, ADF, jump VMs (Private Link) | [Manual Private Link setup](docs/setup-private-link-manual.md) | [Private Link Terraform setup](docs/setup-private-link-terraform.md) |
+| **Databricks Serverless** (NCC) | [NCC manual setup](docs/setup-ncc-manual.md) | [NCC Terraform setup](docs/setup-ncc-terraform.md) |
+| **Your VNet**: classic Databricks, AKS, ADF, jump VMs (Private Link) | [Private Link manual setup](docs/setup-private-link-manual.md) | [Private Link Terraform setup](docs/setup-private-link-terraform.md) |
 
 - **NCC, manual.** The Databricks CLI or REST steps, with a console alternative where one exists. Start here to understand each step.
 - **NCC, Terraform.** `scripts/automate.py` runs Terraform, polls the endpoint rule to `ESTABLISHED`, restarts warehouses, loads the `neo4j` secret scope, and runs the validation notebook. Recommended for the NCC demo.
@@ -58,7 +59,9 @@ Pick the row that matches **what reaches Aura**, then the column that matches **
 - **Private Link, manual.** The Azure CLI creates the private endpoint and the private DNS. [`scripts/private_link.py`](scripts/private_link.py) runs the same commands, and `--dry-run` shows what it would change.
 - **Private Link, Terraform.** The [`azure-private-endpoint`](infra/terraform/azure-private-endpoint/) stack creates the private endpoint and DNS. See [infra/terraform/README.md](infra/terraform/README.md) for which stack to pick.
 
-The Aura console has no API, so its steps are manual in every path. They are collected in [Aura console steps](docs/shared/aura-console-steps.md): provision Aura, enable Private Link, allow-list the consumer subscription, approve the endpoint, and disable public access. Every path ends with [Validate connectivity](docs/shared/validate-connectivity.md).
+The guides call the two paths NCC and Private Link. The Terraform folders for them are the **NCC stack** (`databricks-ncc`) and the **Private Endpoint stack** (`azure-private-endpoint`).
+
+The Aura console has no API, so its steps are manual in every path. They are collected in [Aura console steps](docs/shared/aura-console-steps.md): provision Aura, enable Private Link, allow-list the consumer subscription, approve the endpoint, and disable public access. Every guide ends with the same follow-up steps: validate connectivity, close the public endpoint, teardown, and what's next. The NCC guides and the Private Link Terraform guide give each step its own section. The Private Link manual guide groups them under [After setup: what comes next for both options](docs/setup-private-link-manual.md#after-setup-what-comes-next-for-both-options), with an extra step to add routing-host records. Each path validates in its own guide: [NCC](docs/setup-ncc-manual.md#validate-connectivity) and [Private Link](docs/setup-private-link-manual.md#validate-connectivity).
 
 ---
 
@@ -89,7 +92,7 @@ The Aura console has no API, so its steps are manual in every path. They are col
 │   ├── setup-private-link-terraform.md             # Private Endpoint and DNS setup with Terraform
 │   ├── shared/                                     # Steps common to every setup path
 │   │   ├── aura-console-steps.md                   # Aura provisioning, allow-list, approval, public access
-│   │   └── validate-connectivity.md                # Secret scope, notebooks, validation
+│   │   └── private-dns-central.md                  # Private DNS ownership and central hub DNS for Private Link
 │   ├── operations/                                 # Running and removing the setup
 │   │   ├── troubleshooting.md
 │   │   ├── teardown.md
@@ -119,14 +122,14 @@ The Aura console has no API, so its steps are manual in every path. They are col
 │   ├── create-secret-scope.sh                      # Databricks secret scope setup
 │   ├── create-private-endpoint-rule.sh             # REST API fallback for the NCC PE rule
 │   └── validate-dns.py                             # Standalone DNS check
-└── screenshots/                                    # Console screenshots of the Private Link Terraform setup
+└── screenshots/                                    # Console screenshots of both setup paths
 ```
 
 ---
 
 ## Validation Report
 
-This repo's setup steps are reconciled against the latest official documentation (May 2026). See [docs/reference/validation-report.md](docs/reference/validation-report.md) for the corrections made to the original draft of this guide, with source links.
+This repo's setup steps are checked against the official Neo4j and Microsoft documentation as of May 2026. [docs/reference/validation-report.md](docs/reference/validation-report.md) lists each correction with its source link.
 
 ---
 
@@ -134,7 +137,7 @@ This repo's setup steps are reconciled against the latest official documentation
 
 Pull requests welcome. Please:
 
-1. Test changes against a real Aura VDC + Databricks Serverless setup
+1. Test changes against a real AuraDB Virtual Dedicated Cloud (VDC) or AuraDS Enterprise instance on Azure. Test each path your change touches: NCC from Databricks Serverless, and Private Link from a VNet.
 2. Update the validation report if Microsoft or Neo4j docs change
 
 ---

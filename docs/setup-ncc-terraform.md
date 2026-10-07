@@ -1,85 +1,72 @@
-# Terraform and automated NCC setup
+# NCC Terraform setup
 
-Exact operator steps to drive a clean Databricks Serverless workspace to a passing
-Neo4j Aura Private Link validation run. To do the Databricks steps by hand instead, see [Manual NCC setup](setup-ncc-manual.md). The Aura console steps are in [Aura console steps](shared/aura-console-steps.md).
+This guide takes a clean Databricks Serverless workspace to a passing Neo4j Aura Private Link validation run with Terraform and `scripts/automate.py`. To do the Databricks steps by hand instead, see [NCC manual setup](setup-ncc-manual.md). The Aura console steps are in [Aura console steps](shared/aura-console-steps.md).
 
-The orchestrator is re-entrant: run it, do the Aura-console action it asks for, run it
-again. A single command drives Terraform, polls the NCC rule to `ESTABLISHED`, restarts
-running SQL warehouses, populates the `neo4j` secret scope, and runs a validation notebook
-on serverless. Two steps pause on a human working in the Aura console.
+The orchestrator is re-entrant: run it, do the Aura console action it asks for, and run it again. A single command drives Terraform, polls the NCC rule to `ESTABLISHED`, restarts running SQL warehouses, populates the `neo4j` secret scope, and runs a validation notebook on serverless. Two steps pause on a human working in the Aura console.
 
-Exit codes: `0` success, `1` error or validation failed, `2` paused (do the named action,
-then re-run).
-
----
+The orchestrator exits `0` on success and `1` on an error or a failed validation. It exits `2` when it pauses. Do the action it names, then run it again.
 
 ## Start here: pick your path
 
-- **Clean or new workspace** (no prior NCC wiring): follow this document top to bottom,
-  starting at *Prerequisites*.
-- **Rebuilding a half-configured workspace** (stale NCCs, an expired rule, a wrong-region
-  binding left from an earlier attempt): tear down the existing wiring **first** (see
-  [Teardown](operations/teardown.md)), then return here and run the orchestrator. Running the
-  flow below against half-configured state operates on a broken binding and will not
-  converge.
+- **Clean or new workspace:** The workspace has no prior NCC wiring. Follow this document top to bottom, starting at [Prerequisites](#prerequisites).
+- **Half-configured workspace:** The workspace has stale NCCs, an expired rule, or a wrong-region binding left from an earlier attempt. Tear down the existing wiring **first**, as in [Teardown](operations/teardown.md), then return here and run the orchestrator. The flow below does not converge against a broken binding.
 
----
+## Prerequisites
 
-## Prerequisites (one time)
+The workspace, account, Azure, and Aura requirements are in the [NCC manual setup prerequisites](setup-ncc-manual.md#prerequisites). The Terraform path adds these:
 
-1. **Tools.** `uv`, `terraform`, `az`, and the `databricks` CLI on `PATH`.
+| Item | Value |
+|------|-------|
+| Terraform | 1.6.0 or later |
+| Databricks Terraform provider | 1.55.0 or later. This version adds `databricks_mws_ncc_binding`. `terraform init` installs it. |
+| Tools | `uv`, `terraform`, `az`, and the `databricks` CLI on `PATH` |
 
-2. **Azure login** as a Databricks account admin against the correct tenant and subscription:
+The stack authenticates through the Azure CLI by default. For CI/CD, it can use a service principal with the Databricks account admin role instead. Fill in the three `azure_*` variables described in [`terraform.tfvars.example`](../infra/terraform/databricks-ncc/terraform.tfvars.example).
+
+Complete these one-time steps before the first run:
+
+1. **Azure login.** Sign in as a Databricks account admin against the correct tenant and subscription:
 
    ```bash
    az login --tenant <TENANT_ID>
    az account set --subscription <SUB_ID>
    ```
 
-   - **Tenant ID:** In the Azure portal, open **Microsoft Entra ID** and read **Tenant ID**
-     under **Basic information** on the **Overview** page. From the CLI, run
-     `az account show --query tenantId -o tsv`. Use the tenant that owns the subscription your
-     Databricks workspace is deployed in.
-   - **Subscription ID:** This is a separate value, listed under **Subscriptions** in the
-     portal.
+   - **Tenant ID:** In the Azure portal, open **Microsoft Entra ID** and read **Tenant ID** under **Basic information** on the **Overview** page. From the CLI, run `az account show --query tenantId -o tsv`. Use the tenant that owns the subscription your Databricks workspace is deployed in.
+   - **Subscription ID:** This is a separate value, listed under **Subscriptions** in the portal.
 
-3. **Workspace CLI profile** exists and authenticates. The commands below use
-   `<workspace-profile>` for its name:
+2. **Workspace CLI profile.** The profile must exist and authenticate. Export its name, along with the workspace URL. The commands in this guide and the notebook upload in the manual guide both read `WORKSPACE_PROFILE`:
 
    ```bash
-   databricks --profile <workspace-profile> current-user me
+   export WORKSPACE_PROFILE="<workspace-profile>"
+   export WORKSPACE_URL="<workspace-url>"
+   databricks --profile "$WORKSPACE_PROFILE" current-user me
    ```
 
    If it reports stored credentials from an older CLI version, sign in again:
 
    ```bash
-   databricks auth login --host <WORKSPACE_URL> --profile <workspace-profile>
+   databricks auth login --host "$WORKSPACE_URL" --profile "$WORKSPACE_PROFILE"
    ```
 
-4. **Account-console CLI profile.** NCC rule polling targets `accounts.azuredatabricks.net`,
-   a different auth context from the workspace. Configure it once. The commands below use
-   `<account-profile>` for its name:
+3. **Account-console CLI profile.** NCC rule polling targets `accounts.azuredatabricks.net`, which is a different auth context from the workspace. Export the profile name and account ID, then sign in once:
 
    ```bash
-   databricks auth login --host https://accounts.azuredatabricks.net --account-id <ACCOUNT_ID> --profile <account-profile>
+   export ACCOUNT_PROFILE="<account-profile>"
+   export DATABRICKS_ACCOUNT_ID="<databricks-account-id>"
+   databricks auth login --host https://accounts.azuredatabricks.net \
+     --account-id "$DATABRICKS_ACCOUNT_ID" --profile "$ACCOUNT_PROFILE"
    ```
 
-   Verify it lists NCCs:
+   Verify that it lists NCCs:
 
    ```bash
-   databricks --profile <account-profile> account network-connectivity list-network-connectivity-configurations
+   databricks --profile "$ACCOUNT_PROFILE" account network-connectivity list-network-connectivity-configurations
    ```
 
-   Any JSON list counts as a pass. Check that each entry shows the `account_id` from the login
-   command above. An auth or permission error means the profile cannot reach the account
-   console. The NCCs listed are existing ones in the account, including expired or other
-   people's rules. Leave them alone, because Terraform creates a new NCC for this run.
+   Any JSON list counts as a pass. Check that each entry shows the `account_id` from the login command above. An auth or permission error means the profile cannot reach the account console. The NCCs listed are existing ones in the account, including expired rules and rules that belong to other people. Leave them alone, because Terraform creates a new NCC for this run.
 
-5. **Terraform variables.** Populate `infra/terraform/databricks-ncc/terraform.tfvars` from
-   the example, confirming the account id, workspace id/url, region, Aura PLS alias, and Aura
-   hostname. The Aura PLS alias and hostname come from the Aura console, so first follow the
-   [Prerequisites](setup-ncc-manual.md#prerequisites) and
-   [Aura console Step 2](shared/aura-console-steps.md#step-2-enable-private-link-in-aura-network-access-configuration):
+4. **Terraform variables.** Copy the example to `infra/terraform/databricks-ncc/terraform.tfvars`. Fill in the account ID, workspace ID and URL, region, Aura PLS alias, and Aura hostname. The Aura PLS alias and hostname come from the Aura console, so complete [Aura console Steps 1 and 2](shared/aura-console-steps.md#step-1-provision-neo4j-aura-vdc-on-azure) first:
 
    ```bash
    # if not already present, then edit:
@@ -87,54 +74,46 @@ then re-run).
       infra/terraform/databricks-ncc/terraform.tfvars
    ```
 
-6. **Aura credentials** for the `neo4j` secret scope, in the repo-root `.env`.
-   `automate.py` loads it automatically at startup (python-dotenv), so no
-   `export` or `source` step is needed:
+5. **Repo-root `.env`.** `automate.py` loads `.env` at startup, so no `export` or `source` step is needed for these values. Copy the sample and fill it in:
+
+   ```bash
+   cp env.sample .env
+   ```
 
    ```bash
    # .env (gitignored)
-   NEO4J_URI="neo4j+s://<dbid>.databases.neo4j.io"
+   WORKSPACE_PROFILE="<workspace-profile>"
+   NEO4J_URI="neo4j+s://<aura-instance-id>.databases.neo4j.io"
    NEO4J_USERNAME="neo4j"
-   NEO4J_PASSWORD="..."
-   NEO4J_DATABASE="neo4j"          # optional, defaults to neo4j
+   NEO4J_PASSWORD="<aura-password>"
+   NEO4J_DATABASE="neo4j"   # optional, defaults to neo4j
    ```
 
-   A real environment variable, if exported, still overrides the `.env` value.
-
----
+   `WORKSPACE_PROFILE` is the default for `--workspace-profile`. The `NEO4J_*` values fill the `neo4j` secret scope. The URI host must match `aura_private_hostname` in `terraform.tfvars`. An exported environment variable overrides the `.env` value.
 
 ## Pre-flight check: the `neo4j` secret scope
 
-The scope name is hardcoded to `neo4j`. If a scope named `neo4j` already exists for a
-different Aura instance, the secrets step will repopulate it and can break whatever else uses
-it. Inspect it first:
+The scope name is fixed as `neo4j`. When the scope already holds all four keys, the secrets step skips the write and leaves the values unchanged. A scope that holds another Aura instance's credentials therefore stays in place, and the validation run connects with those credentials. Inspect the scope first:
 
 ```bash
-databricks --profile <workspace-profile> secrets list-secrets neo4j
+databricks --profile "$WORKSPACE_PROFILE" secrets list-secrets neo4j
 ```
 
-- If the scope is absent, or already holds `uri`, `username`, `password`, `database` for the
-  target instance, proceed.
-- If it holds another instance's credentials, resolve that before running (use a fresh
-  workspace, remove the stale scope, or confirm the overwrite is intended). The secrets step
-  treats the scope as incomplete whenever any of the four expected keys is missing and
-  repopulates it.
+- If the scope is absent, or already holds `uri`, `username`, `password`, and `database` for the target instance, proceed.
+- If the scope is missing any of the four keys, proceed. The secrets step writes all four from `.env`.
+- If the scope holds another instance's credentials, pass `--reset-secret-scope` on the run to replace it. Confirm first that nothing else in the workspace uses that scope.
 
-To remove a stale scope, either delete it by hand:
+`--reset-secret-scope` deletes the scope and recreates it from the `NEO4J_*` values in `.env` in one step. It checks those values before the delete, so it never removes a scope it cannot repopulate:
 
 ```bash
-databricks --profile <workspace-profile> secrets delete-scope neo4j
+uv run scripts/automate.py run --account-profile "$ACCOUNT_PROFILE" --reset-secret-scope
 ```
 
-or pass `--reset-secret-scope` on the run, which deletes the scope and recreates it from the
-`NEO4J_*` values in `.env` in one step (the values are checked before the delete, so it
-never removes a scope it cannot repopulate):
+To delete the scope by hand instead, run this command, then run the orchestrator as usual:
 
 ```bash
-uv run scripts/automate.py run --account-profile <account-profile> --workspace-profile <workspace-profile> --reset-secret-scope
+databricks --profile "$WORKSPACE_PROFILE" secrets delete-scope neo4j
 ```
-
----
 
 ## Run the orchestrator
 
@@ -143,21 +122,16 @@ uv run scripts/automate.py run --account-profile <account-profile> --workspace-p
 From the repo root:
 
 ```bash
-uv run scripts/automate.py run --account-profile <account-profile> --workspace-profile <workspace-profile>
+uv run scripts/automate.py run --account-profile "$ACCOUNT_PROFILE"
 ```
 
-If you omit `--workspace-profile`, it defaults to `azure-rk-knight`, the author's profile.
-Pass your own.
+`--account-profile` is required. `--workspace-profile` defaults to `WORKSPACE_PROFILE` from `.env`. The run stops with an error if neither is set. Pass `--workspace-profile <name>` to target a different workspace profile.
 
-On the first run the Terraform apply is expected to fail with the subscription allow-list
-gotcha. That is by design and produces pause #1 below.
+The first Terraform apply fails on the subscription allow-list. This failure is expected, and it produces pause 1 below.
 
-### 2. Pause #1: Aura subscription allow-list
+### 2. Pause 1: Aura subscription allow-list
 
-The first apply fails with
-`ThirdPartyPrivateLinkServiceProvidedDuringPrivateEndpointCreationDoesNotExistOrIsNotVisible`
-because the private endpoint originates from a Databricks-managed subscription that Aura does
-not yet trust. The orchestrator prints the managed subscription GUID and exits with code `2`.
+The first apply fails with `ThirdPartyPrivateLinkServiceProvidedDuringPrivateEndpointCreationDoesNotExistOrIsNotVisible`. The private endpoint request comes from a Databricks-managed subscription that Aura does not trust yet. The orchestrator prints the managed subscription GUID and exits with code `2`.
 
 Do this, then re-run:
 
@@ -166,26 +140,21 @@ Do this, then re-run:
 3. Re-run the same command:
 
    ```bash
-   uv run scripts/automate.py run --account-profile <account-profile> --workspace-profile <workspace-profile>
+   uv run scripts/automate.py run --account-profile "$ACCOUNT_PROFILE"
    ```
 
-Databricks may retry from more than one managed subscription per region, so this can iterate.
-Add each GUID the tool surfaces, then re-run.
+Databricks can retry from more than one managed subscription per region, so this pause can repeat. Add each GUID the tool reports, then re-run.
 
-### 3. Pause #2: approve the private endpoint
+### 3. Pause 2: approve the private endpoint
 
-Once apply succeeds, the orchestrator polls the NCC rule and reports `PENDING`, then prints
-the approval instruction and exits `2` if it does not reach `ESTABLISHED` within the timeout
-(default 600s).
+Once the apply succeeds, the orchestrator polls the NCC rule and reports `PENDING`. It prints the approval instruction when it first sees `PENDING`. If the rule does not reach `ESTABLISHED` within the poll timeout, it exits `2`. The default timeout is 600 seconds.
 
 Do this, then re-run:
 
-1. Approve the private endpoint in the Aura console, as described in [Aura console Step 4](shared/aura-console-steps.md#step-4-approve-the-private-endpoint-in-the-aura-console).
+1. Approve the private endpoint in the Aura console, as described in [Aura console Step 4](shared/aura-console-steps.md#step-4-approve-the-private-endpoint-in-the-aura-console). Approve it promptly.
 2. Re-run the same command. The poller observes `ESTABLISHED` and continues.
 
-A rule left `PENDING` for 14 days expires; the poller warns as it approaches that limit. If a
-rule reaches `REJECTED`, `DISCONNECTED`, `EXPIRED`, or `CREATE_FAILED`, the tool fails fast
-and tells you to recreate it:
+An NCC private endpoint rule left `PENDING` for 14 days expires. The poller warns once a `PENDING` rule is 12 days old. If a rule reaches `REJECTED`, `DISCONNECTED`, `EXPIRED`, or `CREATE_FAILED`, the tool fails fast and tells you to recreate it:
 
 ```bash
 terraform -chdir=infra/terraform/databricks-ncc taint databricks_mws_ncc_private_endpoint_rule.aura
@@ -196,54 +165,17 @@ terraform -chdir=infra/terraform/databricks-ncc apply
 
 After `ESTABLISHED`, the same invocation continues:
 
-- **Warehouses.** Running SQL warehouses are stopped and started so they pick up NCC-managed
-  DNS. With none running, this is a no-op. Pass `--skip-warehouse-restart` to leave active SQL
-  sessions untouched on re-runs.
-- **Secrets.** If the `neo4j` scope or any of `uri`/`username`/`password`/`database` is
-  missing, the orchestrator creates the scope and sets the four keys directly through the
-  workspace SDK client, using the `NEO4J_*` values loaded from `.env`. It reuses the
-  `--workspace-profile` auth the client already holds, so no bearer token is minted and no
-  helper subprocess runs. (`scripts/create-secret-scope.sh` remains for CLI-only environments.)
-- **Validation notebook.** `notebooks/01_validate_connectivity.py` is imported to
-  `/Shared/aura-privatelink/` (overwrite) and submitted as a one-time serverless run. The run
-  id prints before the wait, so the run is findable in the Jobs UI. Default wait is 30 minutes.
-  If the run does not finish in time, the tool pauses and exits `2`. Check the run in the Jobs
-  UI, then re-run.
+- **Warehouses.** Running SQL warehouses are stopped and started so they pick up NCC-managed DNS. With none running, this step does nothing. Pass `--skip-warehouse-restart` to leave active SQL sessions untouched on re-runs.
+- **Secrets.** If the `neo4j` scope is missing, or lacks any of `uri`, `username`, `password`, and `database`, the orchestrator creates the scope and sets all four keys from the `NEO4J_*` values in `.env`. If all four keys exist, it skips the write. It uses the workspace SDK client and the `--workspace-profile` auth that client already holds, so no bearer token is minted and no helper subprocess runs. `scripts/create-secret-scope.sh` remains for CLI-only environments.
+- **Validation notebook.** The orchestrator imports `notebooks/01_validate_connectivity.py` to `/Shared/aura-privatelink/01_validate_connectivity` in the workspace, overwriting any earlier copy. It submits that notebook as a one-time serverless run. The run ID prints before the wait, so you can find the run in the Jobs UI. The default wait is 30 minutes. If the run does not finish in time, the tool pauses and exits `2`. Check the run in the Jobs UI, then re-run.
 
 On success the tool prints `SUCCESS` and exits `0`.
 
-### 5. Routing-host fallback (reactive)
-
-If the validation run fails because an Aura routing host does not resolve
-(`Cannot resolve address p-...neo4j.io:7687`), the tool prints the exact line to add:
-
-```
-aura_extra_domain_names = ["p-....neo4j.io"]
-```
-
-The orchestrator is print-only here and does not edit `terraform.tfvars`. It exits `1`. Add
-the line yourself in `infra/terraform/databricks-ncc/terraform.tfvars`, then re-run. The run
-applies the updated stack itself:
-
-```bash
-uv run scripts/automate.py run --account-profile <account-profile> --workspace-profile <workspace-profile>
-```
-
 ### Expected pause count
 
-From a clean workspace, expect **two kinds of human stop**, both in the Aura console: the
-subscription allow-list add and the private endpoint approval.
+From a clean workspace, expect **two kinds of human stop**, both in the Aura console: the subscription allow-list add and the private endpoint approval.
 
-You may stop more often in two cases:
-
-- **Several managed subscriptions.** Databricks can retry from more than one managed
-  subscription, so the allow-list pause can repeat once per GUID.
-- **Routing hosts.** If Aura returns routing hosts, the routing-host fallback adds one more
-  stop to edit `terraform.tfvars`.
-
-Any other stop is a failure worth investigating.
-
----
+The allow-list pause can repeat once per GUID, because Databricks can retry from more than one managed subscription. Routing hosts add no stop, because the validation notebook resolves them itself. Any other stop is a failure worth investigating.
 
 ## Reference
 
@@ -251,25 +183,65 @@ Any other stop is a failure worth investigating.
 
 | Flag | Default | Purpose |
 |---|---|---|
-| `--account-profile` | (required) | CLI profile for `accounts.azuredatabricks.net`. Every run polls the rule, including `--no-apply`. |
-| `--workspace-profile` | `azure-rk-knight` | CLI profile for the target workspace. |
-| `--no-apply` | off | Skip `terraform apply`; only read `terraform output -json`. |
+| `--account-profile` | Required | CLI profile for `accounts.azuredatabricks.net`. Every run polls the rule, including `--no-apply`. |
+| `--workspace-profile` | `WORKSPACE_PROFILE` from `.env` | CLI profile for the target workspace. The run errors if neither the flag nor `WORKSPACE_PROFILE` is set. |
+| `--no-apply` | off | Skip `terraform apply`. Read `terraform output -json` only. |
 | `--notebook PATH` | `notebooks/01_validate_connectivity.py` | Validation notebook to run. |
 | `--poll-timeout N` | `600` | Seconds to wait for `ESTABLISHED`. |
 | `--poll-interval N` | `15` | Seconds between rule status polls. |
 | `--run-timeout N` | `30` | Minutes to wait for the validation run. |
-| `--skip-warehouse-restart` | off | Do not stop/start running SQL warehouses. |
+| `--skip-warehouse-restart` | off | Do not stop and start running SQL warehouses. |
 | `--reset-secret-scope` | off | Delete the `neo4j` secret scope before recreating it. |
 
 ### Read-only re-run
 
-To re-check outputs and re-run validation without applying infrastructure (for example after
-success), skip the apply:
+After a successful run, you can re-check the outputs and re-run validation without applying infrastructure:
 
 ```bash
-uv run scripts/automate.py run --no-apply --skip-warehouse-restart --account-profile <account-profile> --workspace-profile <workspace-profile>
+uv run scripts/automate.py run --no-apply --skip-warehouse-restart --account-profile "$ACCOUNT_PROFILE"
 ```
 
-This reads `terraform output -json` instead of applying. It fails with a clear message if the
-stack has not been applied yet. `--no-apply` alone still restarts running SQL warehouses, so
-add `--skip-warehouse-restart` to leave them untouched.
+This reads `terraform output -json` instead of applying. It fails with a clear message if the stack has not been applied yet. `--no-apply` alone still restarts running SQL warehouses, so add `--skip-warehouse-restart` to leave them untouched.
+
+### Routing hosts for clients without a resolver
+
+Aura VDC returns Bolt routing hosts such as `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io` in its routing table. All four repository notebooks install a Neo4j driver resolver that maps these hosts back to the instance host. The default run therefore passes with only `aura_private_hostname` in the rule.
+
+A client without such a resolver fails with `Cannot resolve address p-...neo4j.io:7687`. Your own jobs and apps on serverless fall in this group. The error names the host. Add each host it names to `aura_extra_domain_names` in `infra/terraform/databricks-ncc/terraform.tfvars`:
+
+```hcl
+aura_extra_domain_names = ["p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"]
+```
+
+Then re-run the orchestrator. The run applies the updated stack, and Terraform adds the hosts to the rule's `domain_names`. The CLI equivalent is in [Add a routing hostname later](setup-ncc-manual.md#add-a-routing-hostname-later).
+
+The orchestrator reports routing hosts only when you pass `--notebook` with a notebook that has no resolver. In that case it scans the failed run's output for this error, prints the `aura_extra_domain_names` line to add, and exits `1`. It does not edit `terraform.tfvars`.
+
+### Why the stack uses `databricks_mws_ncc_binding`
+
+The stack attaches the NCC with `databricks_mws_ncc_binding` instead of `databricks_mws_workspaces`. `databricks_mws_workspaces` manages the full workspace lifecycle. Applied to a workspace created outside Terraform, it tries to reconcile every workspace attribute it knows about. That produces spurious diffs and risks unintended workspace changes. `databricks_mws_ncc_binding` manages only the association between the NCC and the workspace.
+
+## Validate connectivity
+
+On success the orchestrator has already created the `neo4j` secret scope. It has also run [notebooks/01_validate_connectivity.py](../notebooks/01_validate_connectivity.py) on serverless compute from `/Shared/aura-privatelink/01_validate_connectivity`. It imports only that one notebook.
+
+To run all four notebooks yourself, including the smoke test in [notebooks/04_smoke_test.py](../notebooks/04_smoke_test.py), follow [Validate connectivity](setup-ncc-manual.md#validate-connectivity) in the NCC manual guide. Skip its secret scope step. Its upload snippet reads the `WORKSPACE_PROFILE` you exported in [Prerequisites](#prerequisites). It copies the notebooks to `/Users/<your-user-name>/neo4j-privatelink`, which is a different folder from the orchestrator's `/Shared/aura-privatelink/`.
+
+## Close the public endpoint
+
+The NCC rule adds a private path. It does not close the public one. After validation succeeds, disable public access in the Aura console, as in [Aura console Step 5](shared/aura-console-steps.md#step-5-disable-public-access-on-aura). Run the outside-in check from that step, then run the validation again with the [read-only re-run](#read-only-re-run).
+
+Disable public access only after validation succeeds. Doing it earlier can lock you out while you debug.
+
+## Teardown
+
+Follow [Teardown: NCC](operations/teardown.md#ncc-databricks-serverless), then the [Aura-side cleanup](operations/teardown.md#aura-side-cleanup-manual-no-api). `terraform destroy` cannot delete the NCC itself, so teardown swaps in a placeholder NCC before it deletes the original.
+
+## What's next
+
+| Topic | Guide |
+|-------|-------|
+| Developer laptop needs Neo4j Desktop or a browser after public access is off | [Developer desktop access](operations/developer-desktop-access.md) |
+| Batch jobs, pipelines, or services in other VNets or subscriptions | [Batch jobs in other VNets](operations/batch-jobs-other-vnets.md) |
+| Something does not resolve or connect | [Troubleshooting](operations/troubleshooting.md) |
+| Run it in production | [Production notes](operations/production-notes.md) |

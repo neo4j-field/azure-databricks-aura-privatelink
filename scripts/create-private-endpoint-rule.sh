@@ -11,14 +11,13 @@
 # Azure App Gateway v2". The same shape works for any third-party PLS.
 #
 # Usage:
-#   export DATABRICKS_HOST=https://accounts.azuredatabricks.net
 #   export DATABRICKS_ACCOUNT_ID=...
 #   export DATABRICKS_TOKEN=...
 #   export NCC_ID=...
-#   export AURA_PLS_ALIAS="pls-aura-xxx.guid.region.azure.privatelinkservice"
-#   export AURA_PRIVATE_HOSTNAME="<aura-id>.databases.neo4j.io"
+#   export AURA_PLS_ALIAS="production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice"
+#   export AURA_PRIVATE_HOSTNAME="<aura-instance-id>.databases.neo4j.io"
 #   # Optional, comma-separated Neo4j routing hosts returned by the driver:
-#   export AURA_EXTRA_DOMAIN_NAMES="p-<aura-id>-<suffix>.<orch>.neo4j.io"
+#   export AURA_EXTRA_DOMAIN_NAMES="p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"
 #   ./scripts/create-private-endpoint-rule.sh
 
 set -euo pipefail

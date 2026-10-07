@@ -42,7 +42,12 @@ from urllib.parse import urlparse
 NEO4J_URI      = dbutils.secrets.get(scope="neo4j", key="uri")
 NEO4J_USER     = dbutils.secrets.get(scope="neo4j", key="username")
 NEO4J_PASSWORD = dbutils.secrets.get(scope="neo4j", key="password")
-NEO4J_DATABASE = "neo4j"
+SECRET_KEYS    = {s.key for s in dbutils.secrets.list("neo4j")}
+NEO4J_DATABASE = (
+    dbutils.secrets.get(scope="neo4j", key="database")
+    if "database" in SECRET_KEYS
+    else "neo4j"
+)
 
 EXPECTED_HOST   = urlparse(NEO4J_URI).hostname
 TEST_LABEL      = "DbxSmokeCustomer"
@@ -96,8 +101,8 @@ from tenacity import (
     wait_exponential,
 )
 
-# Aura VDC advertises routing hosts shaped like p-<dbid>-<suffix>.<orch>.neo4j.io;
-# the dbid is the first label of the connection host.
+# Aura VDC advertises routing hosts shaped like p-<aura-instance-id>-<suffix>.<orch>.neo4j.io;
+# the instance id is the first label of the connection host.
 dbid = EXPECTED_HOST.split(".")[0]
 ROUTING_HOST_PATTERN = re.compile(rf"^p-{re.escape(dbid)}-.*\.neo4j\.io$")
 

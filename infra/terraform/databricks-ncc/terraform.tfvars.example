@@ -32,26 +32,27 @@ databricks_workspace_url = "https://adb-REPLACE_ME.REPLACE_ME.azuredatabricks.ne
 # azure_tenant_id     = "REPLACE_WITH_TENANT_ID"
 
 # ---- Region & naming --------------------------------------------------------
-# Must match the Databricks workspace region exactly (e.g., uksouth, eastus2).
+# Must match the Databricks workspace region exactly, for example eastus.
 azure_region = "REPLACE_WITH_WORKSPACE_REGION"
 
-# Friendly NCC name (lowercase, hyphen-delimited). Recommended pattern:
-#   ncc-aura-privatelink-<region>
-ncc_name = "REPLACE_WITH_NCC_NAME"
+# NCC name, lowercase and hyphen-delimited. The recommended name matches the
+# stack default and the manual guide.
+ncc_name = "ncc-aura-privatelink"
 
 # ---- Neo4j Aura PLS targets (from the Aura console, see docs/shared/aura-console-steps.md Step 2) ----------
 # `aura_pls_resource_id` is the PLS alias surfaced in the Aura UI, e.g.:
-#   production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
+#   production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice
 aura_pls_resource_id = "REPLACE_WITH_AURA_PLS_ALIAS"
 
 # `aura_private_hostname` is the hostname your driver will connect to.
-# Take it from the Aura instance's Connection URI (e.g.,
-# neo4j+s://<dbid>.databases.neo4j.io). For third-party PLS the provider
+# Take it from the Aura instance's Private URI (e.g.,
+# neo4j+s://<aura-instance-id>.databases.neo4j.io). For third-party PLS the provider
 # expects only `resource_id` + `domain_names`; `group_id` is reserved for
 # first-party Azure services and must not be set here.
-aura_private_hostname = "REPLACE_WITH_AURA_PRIVATE_HOSTNAME"   # e.g., abcd1234.databases.neo4j.io
+aura_private_hostname = "REPLACE_WITH_AURA_PRIVATE_HOSTNAME"   # e.g., <aura-instance-id>.databases.neo4j.io
 
-# Optional: add any hostnames returned by the Neo4j driver routing table. Aura
-# VDC can advertise p-*.neo4j.io Bolt addresses that the client also needs to
-# resolve privately through NCC.
+# Optional: Bolt routing hosts such as p-<aura-instance-id>-<suffix>.<orch>.neo4j.io.
+# The repository notebooks map these hosts back to the instance host, so they
+# pass with this list empty. Add a host here when a client without such a
+# resolver reports `Cannot resolve address` for it. The error names the host.
 aura_extra_domain_names = []

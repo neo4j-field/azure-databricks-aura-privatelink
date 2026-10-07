@@ -47,7 +47,7 @@ Usage:
   --reset-secret-scope      Delete the `neo4j` secret scope before recreating it.
 
 Teardown is a manual process (a placeholder-NCC swap that has no clean automation
-plus two Aura-console actions with no API); see the Teardown section in README.md.
+plus two Aura-console actions with no API); see docs/operations/teardown.md.
 """
 
 from __future__ import annotations

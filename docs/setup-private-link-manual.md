@@ -2,7 +2,7 @@
 
 This guide creates the Azure side of the private path by hand: a private endpoint in your VNet that connects to the Aura Private Link service, and the private DNS that makes the Aura hostname resolve to it. It produces the same result as the [`azure-private-endpoint` Terraform stack](../infra/terraform/azure-private-endpoint/), without Terraform.
 
-Use this path when the consumer runs in your own VNet. Typical fits are classic Azure Databricks clusters, AKS, Azure Data Factory self-hosted IR, and jump VMs. For Azure Databricks Serverless, use the [manual NCC setup](manual-ncc-setup.md) instead. Serverless compute runs in Databricks-managed subscriptions and cannot use a private endpoint in your VNet.
+Use this path when the consumer runs in your own VNet. Typical fits are classic Azure Databricks clusters, AKS, Azure Data Factory self-hosted IR, and jump VMs. For Azure Databricks Serverless, use the [manual NCC setup](setup-ncc-manual.md) instead. Serverless compute runs in Databricks-managed subscriptions and cannot use a private endpoint in your VNet.
 
 Each step shows the Azure CLI command first. The portal alternative follows where it helps.
 
@@ -36,13 +36,13 @@ uv run scripts/private_link.py run --dry-run
 
 `verify` compares every A record to the endpoint IP. Add `--vm <name>` to resolve each host from a VM in the VNet. Add `--bolt` to run `RETURN 1` through [`neo4j-cli`](https://github.com/neo4j/neo4j-cli) against `neo4j+s://<instance-id>.databases.neo4j.io`. Pass `--bolt-credential <name>` or `--bolt-env <file>` for the login. The check reports whether the host resolves to a private or a public address, so a pass from a laptop is not mistaken for a pass on the private path.
 
-The script covers the single-VNet DNS mode only. For a central hub DNS, follow [Private DNS: self-managed vs. central](private-endpoint-stack-setup.md#private-dns-self-managed-vs-central-hub-and-spoke).
+The script covers the single-VNet DNS mode only. For a central hub DNS, follow [Private DNS: self-managed vs. central](setup-private-link-terraform.md#private-dns-self-managed-vs-central-hub-and-spoke).
 
 To test the script without Aura, [`scripts/private_link_testbed.py`](../scripts/private_link_testbed.py) builds a stand-in Private Link service with manual approval in a throwaway resource group. Its `up --vm` command builds the stand-in and a VM to resolve DNS from. `approve` plays the part of the Aura console. `down` deletes the resource group, and it refuses any group that lacks the testbed tag.
 
 ## Before you start
 
-You need the Aura values from [README Steps 1 and 2](../README.md#step-1-provision-neo4j-aura-vdc-on-azure). You also need an existing VNet and a subnet that will host the endpoint NIC. The subnet must allow private endpoints, which is the default for modern subnets.
+You need the Aura values from [Aura console Steps 1 and 2](shared/aura-console-steps.md#step-1-provision-neo4j-aura-vdc-on-azure). You also need an existing VNet and a subnet that will host the endpoint NIC. The subnet must allow private endpoints, which is the default for modern subnets.
 
 Your own Azure subscription ID must be in the Aura network access configuration under **Target Azure Subscription IDs**. Without it, the connection request never appears in Aura. Use your own subscription here, not a Databricks-managed one.
 
@@ -80,7 +80,7 @@ echo "$SUBNET_ID"
 
 ## Step 1: Confirm Aura trusts your subscription
 
-Open the Aura console and check **Project settings → Security & Networking → Private endpoints**. Your subscription ID must be listed under **Target Azure Subscription IDs**, as in [README Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration).
+Open the Aura console and check **Project settings → Security & Networking → Private endpoints**. Your subscription ID must be listed under **Target Azure Subscription IDs**, as in [Aura console Step 2](shared/aura-console-steps.md#step-2-enable-private-link-in-aura-network-access-configuration).
 
 Print the subscription ID you are signed in to, and compare it with the Aura list:
 
@@ -116,7 +116,7 @@ Portal alternative: **Private endpoints → Create**. On the **Resource** tab, c
 
 ## Step 3: Approve the endpoint in Aura
 
-Approve the incoming request in the Aura console, as in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console). Approve within a day. A connection that stays `Pending`, `Rejected`, or `Disconnected` for 14 days expires.
+Approve the incoming request in the Aura console, as in [Aura console Step 4](shared/aura-console-steps.md#step-4-approve-the-private-endpoint-in-the-aura-console). Approve within a day. A connection that stays `Pending`, `Rejected`, or `Disconnected` for 14 days expires.
 
 ## Step 4: Check the connection status
 
@@ -144,7 +144,7 @@ The address comes from the subnet range, for example `10.x.x.x`.
 
 ## Step 5: Create the private DNS zone and link it
 
-The endpoint gives you a private IP, but nothing yet connects the Aura hostname to it. A private DNS zone named `databases.neo4j.io` overrides the public answer inside your network. It applies only to the VNets you link, and it changes nothing for the rest of the world. See [Why `databases.neo4j.io` lives in your private DNS zone](private-endpoint-stack-setup.md#why-databasesneo4jio-lives-in-your-private-dns-zone) for the reasoning.
+The endpoint gives you a private IP, but nothing yet connects the Aura hostname to it. A private DNS zone named `databases.neo4j.io` overrides the public answer inside your network. It applies only to the VNets you link, and it changes nothing for the rest of the world. See [Why `databases.neo4j.io` lives in your private DNS zone](setup-private-link-terraform.md#why-databasesneo4jio-lives-in-your-private-dns-zone) for the reasoning.
 
 Create the zone:
 
@@ -176,7 +176,7 @@ az network private-endpoint dns-zone-group create \
 
 Each VNet whose workloads reach Aura needs its own link. Repeat the link command with a different `--name` and `--virtual-network` for every extra VNet.
 
-Your organization may run DNS centrally in a hub VNet. In that case do not create the zone here. Follow [Private DNS: self-managed vs. central](private-endpoint-stack-setup.md#private-dns-self-managed-vs-central-hub-and-spoke) and skip to Step 6 with the hub resource group.
+Your organization may run DNS centrally in a hub VNet. In that case do not create the zone here. Follow [Private DNS: self-managed vs. central](setup-private-link-terraform.md#private-dns-self-managed-vs-central-hub-and-spoke) and skip to Step 6 with the hub resource group.
 
 ## Step 6: Add the instance A record
 
@@ -248,7 +248,7 @@ Do not use a `p-*` record. An Azure private DNS wildcard must be the whole label
 
 ## Step 8: Close the public endpoint
 
-Private Link adds a private path. It does not close the public one. Disable public access in the Aura console, as in [README Step 9](../README.md#step-9-disable-public-access-on-aura). Run the outside-in check from that step, then repeat the verification in Step 7.
+Private Link adds a private path. It does not close the public one. Disable public access in the Aura console, as in [Aura console Step 5](shared/aura-console-steps.md#step-5-disable-public-access-on-aura). Run the outside-in check from that step, then repeat the verification in Step 7.
 
 Disable public access only after validation succeeds. Doing it earlier can lock you out while you debug.
 
@@ -274,20 +274,8 @@ az network private-dns record-set a add-record \
 
 ## Teardown
 
-Delete only what you created in this guide. Never delete a hub zone that other teams use.
-
-```bash
-az network private-endpoint delete --name "$PE_NAME" --resource-group "$RG"
-
-az network private-dns link vnet delete --resource-group "$RG" \
-  --zone-name "$ZONE" --name "${PE_NAME}-vnet-link" --yes
-az network private-dns zone delete --resource-group "$RG" --name "$ZONE" --yes
-```
-
-Deleting the zone removes the A records inside it. If you created an `<orch>.neo4j.io` zone, delete its link and the zone the same way.
-
-Then open the Aura private endpoints page and remove the orphaned approval, as in [Teardown step 4](teardown.md#step-4-aura-side-cleanup-manual-no-api).
+See [Teardown](operations/teardown.md#private-link-manual) for the commands that remove the private endpoint and the private DNS zone, and the [Aura-side cleanup](operations/teardown.md#aura-side-cleanup-manual-no-api).
 
 ## What this guide does not cover
 
-Developer laptops that need Neo4j Desktop or a browser are covered in [Developer desktop access](developer-desktop-access.md). Workloads in other VNets or subscriptions are covered in [Batch jobs in other VNets](batch-jobs-other-vnets.md).
+Developer laptops that need Neo4j Desktop or a browser are covered in [Developer desktop access](operations/developer-desktop-access.md). Workloads in other VNets or subscriptions are covered in [Batch jobs in other VNets](operations/batch-jobs-other-vnets.md).

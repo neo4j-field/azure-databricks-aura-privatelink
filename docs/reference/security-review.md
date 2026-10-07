@@ -2,6 +2,8 @@
 
 Review date: 2026-10-06
 
+File paths and line numbers in this review refer to the repo layout at the time of the review. Docs have since moved. For example, `docs/manual-ncc-setup.md` is now `docs/setup-ncc-manual.md`, and README Steps 1, 2, 7, and 9 are now in `docs/shared/aura-console-steps.md`.
+
 ## Overview
 
 This repo connects Azure Databricks serverless compute to Neo4j Aura over Azure Private Link. It has three Terraform stacks, a set of scripts, four notebooks, and a docs folder.

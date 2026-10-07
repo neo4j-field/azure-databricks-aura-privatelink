@@ -5,7 +5,7 @@
 # MAGIC End-to-end smoke test for Azure Databricks Serverless → Neo4j Aura VDC over Azure Private Link.
 # MAGIC
 # MAGIC **Prerequisites**
-# MAGIC - NCC attached to this workspace (Step 5 of repo README)
+# MAGIC - NCC attached to this workspace (Step 2 of docs/setup-ncc-manual.md)
 # MAGIC - Private endpoint rule established for Aura PLS (Step 6)
 # MAGIC - Aura side has approved the endpoint (Step 7)
 # MAGIC - Databricks secret scope `neo4j` exists with keys: `uri`, `username`, `password`

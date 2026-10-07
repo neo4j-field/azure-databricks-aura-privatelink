@@ -13,7 +13,7 @@ End-to-end visual walkthrough validated against:
 - A Windows test VM in a customer VNet, subnet `default` (East US)
 - Private Endpoint `pe-neo4j-aura-uksouth` with NIC IP `172.16.0.6`
 
-The screenshots are numbered in the chronological order an operator would see them when following [Private Endpoint stack setup](../docs/private-endpoint-stack-setup.md).
+The screenshots are numbered in the chronological order an operator would see them when following [Private Link Terraform setup](../docs/setup-private-link-terraform.md).
 
 | # | File | Stage | What it shows |
 |---|------|-------|---------------|

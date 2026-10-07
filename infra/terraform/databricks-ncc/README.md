@@ -35,7 +35,7 @@ terraform apply tfplan
 
 After a successful apply:
 
-1. Approve the incoming PE in the Aura console (see [README Step 7](../../../README.md#step-7-approve-the-private-endpoint-in-the-aura-console)).
+1. Approve the incoming PE in the Aura console (see [Aura console Step 4](../../../docs/shared/aura-console-steps.md#step-4-approve-the-private-endpoint-in-the-aura-console)).
 2. Refresh the NCC view in the Databricks account console. The rule status should transition from `PENDING` to `ESTABLISHED` (usually under a minute).
 3. Restart any running serverless compute in the workspace (SQL warehouses, jobs).
 4. Run a smoke-test notebook from the workspace to validate the private path.
@@ -52,7 +52,7 @@ The failed `terraform apply` exposes the right sub ID in its error message. Look
 
 **Fix:**
 
-1. Open the Aura private endpoints page, as described in [README Step 2](../../../README.md#step-2-enable-private-link-in-aura-network-access-configuration). Edit the configuration for the Aura instance's region.
+1. Open the Aura private endpoints page, as described in [Aura console Step 2](../../../docs/shared/aura-console-steps.md#step-2-enable-private-link-in-aura-network-access-configuration). Edit the configuration for the Aura instance's region.
 2. **Add subscription ID** → paste the Databricks-managed sub from the error path. Keep your existing subs in the list.
 3. Save and wait ~1 minute.
 4. Re-run `terraform plan -out=tfplan && terraform apply tfplan`.

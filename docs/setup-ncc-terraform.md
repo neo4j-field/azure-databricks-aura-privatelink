@@ -1,7 +1,7 @@
-# Running `scripts/automate.py`
+# Terraform and automated NCC setup
 
 Exact operator steps to drive a clean Databricks Serverless workspace to a passing
-Neo4j Aura Private Link validation run.
+Neo4j Aura Private Link validation run. To do the Databricks steps by hand instead, see [Manual NCC setup](setup-ncc-manual.md). The Aura console steps are in [Aura console steps](shared/aura-console-steps.md).
 
 The orchestrator is re-entrant: run it, do the Aura-console action it asks for, run it
 again. A single command drives Terraform, polls the NCC rule to `ESTABLISHED`, restarts
@@ -19,7 +19,7 @@ then re-run).
   starting at *Prerequisites*.
 - **Rebuilding a half-configured workspace** (stale NCCs, an expired rule, a wrong-region
   binding left from an earlier attempt): tear down the existing wiring **first** (see
-  [Teardown](teardown.md)), then return here and run the orchestrator. Running the
+  [Teardown](operations/teardown.md)), then return here and run the orchestrator. Running the
   flow below against half-configured state operates on a broken binding and will not
   converge.
 
@@ -78,8 +78,8 @@ then re-run).
 5. **Terraform variables.** Populate `infra/terraform/databricks-ncc/terraform.tfvars` from
    the example, confirming the account id, workspace id/url, region, Aura PLS alias, and Aura
    hostname. The Aura PLS alias and hostname come from the Aura console, so first follow the
-   [README Prerequisites](../README.md#prerequisites) and
-   [Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration):
+   [Prerequisites](setup-ncc-manual.md#prerequisites) and
+   [Aura console Step 2](shared/aura-console-steps.md#step-2-enable-private-link-in-aura-network-access-configuration):
 
    ```bash
    # if not already present, then edit:
@@ -161,7 +161,7 @@ not yet trust. The orchestrator prints the managed subscription GUID and exits w
 
 Do this, then re-run:
 
-1. Open the Aura private endpoints page, as described in [README Step 6](../README.md#step-6-add-a-private-endpoint-rule-for-neo4j-aura-pls).
+1. Open the Aura private endpoints page, as described in [Aura console Step 3](shared/aura-console-steps.md#step-3-allow-list-the-consumer-subscription).
 2. Add the printed subscription GUID to **Target Azure Subscription IDs**.
 3. Re-run the same command:
 
@@ -180,7 +180,7 @@ the approval instruction and exits `2` if it does not reach `ESTABLISHED` within
 
 Do this, then re-run:
 
-1. Approve the private endpoint in the Aura console, as described in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console).
+1. Approve the private endpoint in the Aura console, as described in [Aura console Step 4](shared/aura-console-steps.md#step-4-approve-the-private-endpoint-in-the-aura-console).
 2. Re-run the same command. The poller observes `ESTABLISHED` and continues.
 
 A rule left `PENDING` for 14 days expires; the poller warns as it approaches that limit. If a

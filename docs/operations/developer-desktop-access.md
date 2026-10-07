@@ -35,7 +35,7 @@ documented patterns.
 
 ## How it works
 
-![A laptop reaches Aura through Azure Bastion or a point-to-site VPN, then the private DNS zone and private endpoint](images/desktop-access-overview.svg)
+![A laptop reaches Aura through Azure Bastion or a point-to-site VPN, then the private DNS zone and private endpoint](../images/desktop-access-overview.svg)
 
 ---
 
@@ -51,12 +51,12 @@ lets a desktop SSH client connect. This is necessary for port-forwarding Neo4j t
 
 ### What you will build
 
-![Developer laptop to Azure Bastion, jump box VM, private endpoint NIC, and Aura](images/desktop-bastion-path.svg)
+![Developer laptop to Azure Bastion, jump box VM, private endpoint NIC, and Aura](../images/desktop-bastion-path.svg)
 
 ### Step 1: Deploy the jump box and Bastion
 
 This repo includes a Terraform module at
-[`infra/terraform/jumpbox/`](../infra/terraform/jumpbox/). Add it to your
+[`infra/terraform/jumpbox/`](../../infra/terraform/jumpbox/). Add it to your
 deployment after the private endpoint stack:
 
 ```hcl
@@ -209,7 +209,7 @@ with the Private URI as-is, with no hosts file changes and no tunnel window to k
 
 ### Architecture
 
-![Developer laptop to the VPN gateway, private DNS zone, private endpoint NIC, and Aura](images/desktop-vpn-path.svg)
+![Developer laptop to the VPN gateway, private DNS zone, private endpoint NIC, and Aura](../images/desktop-vpn-path.svg)
 
 ### Prerequisites
 

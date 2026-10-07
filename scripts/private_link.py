@@ -6,13 +6,13 @@
 """
 private_link.py - set up Azure Private Link to Neo4j Aura with the Azure CLI, no Terraform.
 
-This wraps the commands in docs/private-link-manual-setup.md. It creates a private
+This wraps the commands in docs/setup-private-link-manual.md. It creates a private
 endpoint in your VNet that targets the Aura Private Link service, then wires the
 private DNS so the Aura hostname resolves to the endpoint NIC. Every `az` call is
 printed to stderr, so the output doubles as a transcript of the manual steps.
 
 It matches the single-VNet mode of the Terraform stack (`manage_private_dns = true`).
-For a central hub DNS, follow docs/private-endpoint-stack-setup.md instead.
+For a central hub DNS, follow docs/setup-private-link-terraform.md instead.
 
 Auth is the Azure CLI session:
   az login --tenant <tenant-id>

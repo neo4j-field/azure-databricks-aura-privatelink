@@ -138,7 +138,7 @@ output "next_steps" {
     Private endpoint submitted to Aura PLS.
 
     Next:
-    1. Open the Aura console private endpoints page (README Step 7 in the repo root).
+    1. Open the Aura console private endpoints page (docs/shared/aura-console-steps.md, Step 4).
     2. Approve the incoming endpoint request from this subscription.
     3. Confirm the PE shows `Approved` in the Azure portal.
     4. From any VM/cluster in the linked VNet, verify DNS resolution:

@@ -13,7 +13,7 @@ process.
 
 ## Why it breaks
 
-![A batch VNet resolves the Aura hostname to a public IP while the consumer VNet resolves it to a private IP](images/batch-vnet-dns-gap.svg)
+![A batch VNet resolves the Aura hostname to a public IP while the consumer VNet resolves it to a private IP](../images/batch-vnet-dns-gap.svg)
 
 The Private DNS Zone `databases.neo4j.io` is linked to the consumer VNet only.
 Workloads in any other VNet resolve via public DNS until you explicitly link the
@@ -27,7 +27,7 @@ zone to their VNet.
 |----------|-----|
 | Batch VNet is in the **same subscription** as the consumer VNet | [Option A](#option-a-add-a-vnet-link-to-the-private-dns-zone). Add a VNet link and VNet peering |
 | Batch VNet is in a **different subscription** | [Option B](#option-b-create-a-new-private-endpoint-in-the-batch-vnet). Add subscription to Aura, deploy a new Private Endpoint |
-| **Databricks Serverless** | Use the [`databricks-ncc/` Terraform stack](../infra/terraform/databricks-ncc/). NCC manages DNS independently |
+| **Databricks Serverless** | Use the [`databricks-ncc/` Terraform stack](../../infra/terraform/databricks-ncc/). NCC manages DNS independently |
 | **Databricks classic (VNet-injected)** | Option A. Link the DNS zone to the Databricks VNet + peer VNets |
 
 ---
@@ -153,14 +153,14 @@ Private Link Service allows multiple consumers from different subscriptions.
 
 ### Step 1: Register the batch subscription in Aura
 
-Open the Aura private endpoints page, as described in [README Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration).
+Open the Aura private endpoints page, as described in [Aura console Step 2](../shared/aura-console-steps.md#step-2-enable-private-link-in-aura-network-access-configuration).
 Edit the network access configuration and add the batch subscription ID to the
 **Target Azure Subscription IDs** list. This allowlists incoming connection
 requests from the batch subscription.
 
 ### Step 2: Deploy a new Private Endpoint in the batch VNet
 
-Use the [`azure-private-endpoint/` Terraform stack](../infra/terraform/azure-private-endpoint/)
+Use the [`azure-private-endpoint/` Terraform stack](../../infra/terraform/azure-private-endpoint/)
 with a `terraform.tfvars` file targeting the batch subscription:
 
 ```hcl
@@ -185,7 +185,7 @@ terraform apply -var-file="batch.tfvars"
 
 The new Private Endpoint creates a pending connection request in Aura.
 
-1. Open the Aura private endpoints page, as described in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console)
+1. Open the Aura private endpoints page, as described in [Aura console Step 4](../shared/aura-console-steps.md#step-4-approve-the-private-endpoint-in-the-aura-console)
 2. Locate the pending request from the batch subscription
 3. Click **Accept**
 4. Wait for status to reach **Approved**

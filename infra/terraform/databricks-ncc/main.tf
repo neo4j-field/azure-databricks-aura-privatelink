@@ -87,7 +87,7 @@ output "next_steps" {
 
     Next:
     1. Approve the incoming endpoint request in the Aura console
-       (see README Step 7 in the repo root).
+       (see docs/shared/aura-console-steps.md, Step 4).
     2. Wait until the rule reads ESTABLISHED in the Databricks NCC view
        (refresh the account console; can take a few minutes).
     3. Restart any running serverless compute (SQL warehouses, running jobs).

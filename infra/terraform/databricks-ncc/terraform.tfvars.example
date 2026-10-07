@@ -39,7 +39,7 @@ azure_region = "REPLACE_WITH_WORKSPACE_REGION"
 #   ncc-aura-privatelink-<region>
 ncc_name = "REPLACE_WITH_NCC_NAME"
 
-# ---- Neo4j Aura PLS targets (from the Aura console, see README Step 2) ----------
+# ---- Neo4j Aura PLS targets (from the Aura console, see docs/shared/aura-console-steps.md Step 2) ----------
 # `aura_pls_resource_id` is the PLS alias surfaced in the Aura UI, e.g.:
 #   production-orch-XXXX-service.<guid>.<region>.azure.privatelinkservice
 aura_pls_resource_id = "REPLACE_WITH_AURA_PLS_ALIAS"

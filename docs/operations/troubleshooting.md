@@ -73,7 +73,7 @@ driver = GraphDatabase.driver(
 
 **Diagnosis order:**
 
-1. Check the Aura private endpoints page for an incoming request, as described in [README Step 7](../README.md#step-7-approve-the-private-endpoint-in-the-aura-console). Approve it if present.
+1. Check the Aura private endpoints page for an incoming request, as described in [Aura console Step 4](../shared/aura-console-steps.md#step-4-approve-the-private-endpoint-in-the-aura-console). Approve it if present.
 2. If no request appears, verify the subscription ID in the Aura network access configuration matches the Databricks-managed subscription shown in the Terraform/Azure error path. Databricks may use more than one managed subscription per region, so repeat this for each new `/subscriptions/<guid>/resourceGroups/prod-<region>-snp-...` value exposed by retries.
 3. Verify regions align.
 
@@ -110,7 +110,7 @@ driver = GraphDatabase.driver(
 
 **Cause:** You're trying to add a third-party PLS via the UI. The UI only supports native Azure resources.
 
-**Fix:** Use the REST API path documented in [scripts/create-private-endpoint-rule.sh](../scripts/create-private-endpoint-rule.sh).
+**Fix:** Use the REST API path documented in [scripts/create-private-endpoint-rule.sh](../../scripts/create-private-endpoint-rule.sh).
 
 ## After disabling public access, jobs fail
 
@@ -135,4 +135,4 @@ databricks secrets put-secret neo4j password --string-value "<password>"
 databricks secrets put-secret neo4j uri --string-value "neo4j+s://<dbid>.databases.neo4j.io"
 ```
 
-See [scripts/create-secret-scope.sh](../scripts/create-secret-scope.sh) for the full setup.
+See [scripts/create-secret-scope.sh](../../scripts/create-secret-scope.sh) for the full setup.

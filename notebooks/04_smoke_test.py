@@ -59,7 +59,7 @@ print(f"Run tag  : {TEST_BATCH_TAG}")
 # MAGIC %md ## 2. DNS must resolve to a private IP
 # MAGIC
 # MAGIC If this fails, the NCC private endpoint rule is missing the `domain_names`
-# MAGIC field or the rule is not yet `ESTABLISHED`. See `docs/troubleshooting.md`.
+# MAGIC field or the rule is not yet `ESTABLISHED`. See `docs/operations/troubleshooting.md`.
 
 # COMMAND ----------
 

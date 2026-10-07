@@ -76,7 +76,7 @@ For the Private Endpoint stack there are two topologies, and the distinction mat
 
 Enterprises almost always centralize DNS: the hub owns every private zone and spokes are forbidden (by convention or Azure Policy) from creating their own. If this stack created a second `databases.neo4j.io` zone inside a spoke, resolution goes split-brain (two zones, one name, winner decided by which zone a VNet is linked to) or the apply is denied by policy. So `manage_private_dns = false` is the "defer to central DNS" switch: it provisions the PE only and hands DNS back to the platform team, who add the A record (pointing at the PE NIC IP) and the routing-host records in the hub.
 
-The [Aura routing-hostname](troubleshooting.md#neo4j-driver-cannot-resolve-p-neo4jio) caveat applies to **both** topologies: Aura advertises `p-<dbid>-<suffix>.<orch>.neo4j.io` routing addresses after the first connection, and those must resolve to the same private IP. On the NCC stack they go in `aura_extra_domain_names`. On the Private Endpoint stack they become one A record per host in a private DNS zone for their `<orch>.neo4j.io` domain, because they do not sit under `databases.neo4j.io`. Setup and worked steps live in the [Private Endpoint stack setup](private-endpoint-stack-setup.md#routing-host-records).
+The [Aura routing-hostname](operations/troubleshooting.md#neo4j-driver-cannot-resolve-p-neo4jio) caveat applies to **both** topologies: Aura advertises `p-<dbid>-<suffix>.<orch>.neo4j.io` routing addresses after the first connection, and those must resolve to the same private IP. On the NCC stack they go in `aura_extra_domain_names`. On the Private Endpoint stack they become one A record per host in a private DNS zone for their `<orch>.neo4j.io` domain, because they do not sit under `databases.neo4j.io`. Setup and worked steps live in the [Private Link Terraform setup](setup-private-link-terraform.md#routing-host-records).
 
 ## Supported resource categories in Databricks NCC
 
@@ -94,7 +94,7 @@ Neo4j Aura falls under **Resources behind a Standard Load Balancer**. This categ
 
 | Failure | Symptom | Recovery |
 |---------|---------|----------|
-| Subscription not registered in the Aura network access configuration | PE creation in Azure succeeds but Aura never sees the request | Add the subscription ID in the Aura console ([Step 2](../README.md#step-2-enable-private-link-in-aura-network-access-configuration)), then re-create the rule ([Step 6](../README.md#step-6-add-a-private-endpoint-rule-for-neo4j-aura-pls)) |
+| Subscription not registered in the Aura network access configuration | PE creation in Azure succeeds but Aura never sees the request | Add the subscription ID in the Aura console ([Aura console Step 3](shared/aura-console-steps.md#step-3-allow-list-the-consumer-subscription)), then re-create the rule ([manual NCC Step 3](setup-ncc-manual.md#step-3-create-the-private-endpoint-rule)) |
 | `domain_names` omitted in NCC rule | DNS resolves to public Aura IP; connection works but isn't private | Update the rule with a PATCH request (`?update_mask=domain_names`), then restart serverless |
 | NCC attached but services not restarted | Existing sessions still use old routing | Restart all serverless compute (SQL warehouses, running jobs) |
 | Rule expired (14 days in PENDING) | NCC rule disappears or is in `EXPIRED` state | Re-create the rule via API; re-approve in Aura console |

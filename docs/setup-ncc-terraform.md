@@ -13,7 +13,9 @@ The orchestrator exits `0` on success and `1` on an error or a failed validation
 
 ## Prerequisites
 
-The workspace, account, Azure, and Aura requirements are in the [NCC manual setup prerequisites](setup-ncc-manual.md#prerequisites). The Terraform path adds these:
+The workspace, account, Azure, and Aura requirements are in the [NCC manual setup prerequisites](setup-ncc-manual.md#prerequisites). The profile names, account ID, and Neo4j credentials below live in the repo-root `.env`. [Environment setup](env-setup.md) says where to find each one and how to load them with `source scripts/load-env.sh`.
+
+The Terraform path adds these:
 
 | Item | Value |
 |------|-------|
@@ -35,11 +37,11 @@ Complete these one-time steps before the first run:
    - **Tenant ID:** In the Azure portal, open **Microsoft Entra ID** and read **Tenant ID** under **Basic information** on the **Overview** page. From the CLI, run `az account show --query tenantId -o tsv`. Use the tenant that owns the subscription your Databricks workspace is deployed in.
    - **Subscription ID:** This is a separate value, listed under **Subscriptions** in the portal.
 
-2. **Workspace CLI profile.** The profile must exist and authenticate. Export its name, along with the workspace URL. The commands in this guide and the notebook upload in the manual guide both read `WORKSPACE_PROFILE`:
+2. **Workspace CLI profile.** The profile must exist and authenticate. Create the repo-root `.env` from the sample file if it does not exist yet, and set `WORKSPACE_PROFILE` and `WORKSPACE_URL` in it. Then load it into your shell. The commands in this guide and the notebook upload in the manual guide both read `WORKSPACE_PROFILE`. Run the load command again after each edit to `.env`:
 
    ```bash
-   export WORKSPACE_PROFILE="<workspace-profile>"
-   export WORKSPACE_URL="<workspace-url>"
+   [ -f .env ] || cp env.sample .env
+   source scripts/load-env.sh
    databricks --profile "$WORKSPACE_PROFILE" current-user me
    ```
 
@@ -49,11 +51,10 @@ Complete these one-time steps before the first run:
    databricks auth login --host "$WORKSPACE_URL" --profile "$WORKSPACE_PROFILE"
    ```
 
-3. **Account-console CLI profile.** NCC rule polling targets `accounts.azuredatabricks.net`, which is a different auth context from the workspace. Export the profile name and account ID, then sign in once:
+3. **Account-console CLI profile.** NCC rule polling targets `accounts.azuredatabricks.net`, which is a different auth context from the workspace. Set `ACCOUNT_PROFILE` and `DATABRICKS_ACCOUNT_ID` in `.env`, load it again, then sign in once:
 
    ```bash
-   export ACCOUNT_PROFILE="<account-profile>"
-   export DATABRICKS_ACCOUNT_ID="<databricks-account-id>"
+   source scripts/load-env.sh
    databricks auth login --host https://accounts.azuredatabricks.net \
      --account-id "$DATABRICKS_ACCOUNT_ID" --profile "$ACCOUNT_PROFILE"
    ```
@@ -74,11 +75,7 @@ Complete these one-time steps before the first run:
       infra/terraform/databricks-ncc/terraform.tfvars
    ```
 
-5. **Repo-root `.env`.** `automate.py` loads `.env` at startup, so no `export` or `source` step is needed for these values. Copy the sample and fill it in:
-
-   ```bash
-   cp env.sample .env
-   ```
+5. **Neo4j values in `.env`.** `automate.py` loads `.env` at startup, so it needs no `source` step for these values. Add the Neo4j credentials to the `.env` you created in step 2:
 
    ```bash
    # .env (gitignored)

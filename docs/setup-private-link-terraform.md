@@ -29,6 +29,8 @@ With `manage_private_dns = false`, the stack creates only the private endpoint. 
 
 ## Prerequisites
 
+The manual commands and scripts in this guide read their values from the repo-root `.env`. [Environment setup](env-setup.md) says where to find each one and how to load them with `source scripts/load-env.sh`.
+
 - Terraform >= 1.6.0
 - An existing VNet and a subnet that will host the PE NIC. The subnet must allow private endpoints, which is the default for modern subnets.
 - The subscription you deploy into is **already registered** in the Aura console under **Target Azure Subscription IDs**, as in [Aura console Step 3](shared/aura-console-steps.md#step-3-allow-list-the-consumer-subscription). Paste your own subscription IDs there, not a Databricks-managed one. Without this, the connection request never appears in Aura for approval.
@@ -92,27 +94,31 @@ The `ncc-notebooks/` set maps routing hosts back to the instance host, so it nev
 
 The steps below cover the single-VNet mode. With central hub DNS, add the records in the hub as in [Add routing-host records when a client needs them](shared/private-dns-central.md#step-4-add-routing-host-records-when-a-client-needs-them).
 
-Set the values from `terraform.tfvars`. Run the commands in this section from `infra/terraform/azure-private-endpoint`:
+Set these values in the repo-root `.env`, copying them from `terraform.tfvars`:
+
+| `.env` variable | `terraform.tfvars` variable |
+|-----------------|-----------------------------|
+| `RG` | `resource_group_name` |
+| `VNET` | `virtual_network_name` |
+| `VNET_RG` | `vnet_resource_group_name`. The loader uses the value of `RG` when you leave it unset. |
+| `PE_NAME` | `private_endpoint_name` |
+
+Run the commands in this section from `infra/terraform/azure-private-endpoint`. Load `.env` into your shell first:
 
 ```bash
-export RG="<resource-group>"              # resource_group_name
-export VNET="<vnet-name>"                 # virtual_network_name
-export VNET_RG="<vnet-resource-group>"    # vnet_resource_group_name, or the same value as RG
-export PE_NAME="<private-endpoint-name>"  # private_endpoint_name
+source ../../../scripts/load-env.sh
 ```
 
-**Script.** The script reads `RG`, `VNET`, `VNET_RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the repo-root `.env`, not from the variables above. Add the same values there. Run this once for each host a client reports. It creates the zone and the link the first time and adds one A record each time:
+**Script.** The script reads `RG`, `VNET`, `VNET_RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the same `.env`, and ignores exported variables. Run this once for each host a client reports. It creates the zone and the link the first time and adds one A record each time:
 
 ```bash
 uv run ../../../scripts/private_link.py add-routing-host "p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"
 ```
 
-**Manual.** Set the routing host from the error message, then derive the zone and the record name from it. Read the endpoint IP and the VNet ID as well:
+**Manual.** Set `ROUTING_HOST` in `.env` from the error message, for example `ROUTING_HOST="p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"`, and load it again. The loader derives the zone and the record name from it. `ORCH_ZONE` is everything after the first label, and `ROUTING_LABEL` is the first label. Then read the endpoint IP and the VNet ID:
 
 ```bash
-export ROUTING_HOST="p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"
-export ORCH_ZONE="${ROUTING_HOST#*.}"       # everything after the first label
-export ROUTING_LABEL="${ROUTING_HOST%%.*}"  # the first label
+source ../../../scripts/load-env.sh
 export PE_IP="$(terraform output -raw private_endpoint_nic_ip)"
 export VNET_ID="$(az network vnet show --resource-group "$VNET_RG" \
   --name "$VNET" --query id -o tsv)"
@@ -154,12 +160,10 @@ After you add the records, run the validation again.
 
 DNS on this path comes from the private DNS zone you linked to the VNet, not from Databricks. Run every check from a VM, cluster, or pod inside a linked VNet. A machine outside the linked VNets resolves the public address, so a pass there says nothing about the private path.
 
-Set the values from `terraform.tfvars`. The checks below and the script read them:
+The checks below and the script read `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from `.env`. Copy them from `resource_group_name`, `private_endpoint_name`, and `aura_instance_id` in `terraform.tfvars`. The loader takes `AURA_INSTANCE_ID` from `NEO4J_URI` when you leave it unset. Load the file from the repository root:
 
 ```bash
-export RG="<resource-group>"                  # resource_group_name
-export PE_NAME="<private-endpoint-name>"      # private_endpoint_name
-export AURA_INSTANCE_ID="<aura-instance-id>"  # aura_instance_id
+source scripts/load-env.sh
 ```
 
 ### Check DNS and the Bolt port
@@ -173,7 +177,7 @@ The `nslookup` answer must be the endpoint private IP. A public address means th
 
 ### Run a Bolt query
 
-**Script.** [`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the repo-root `.env`, so add the same three values there. Run it from the repository root:
+**Script.** [`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the same `.env`. Run it from the repository root:
 
 ```bash
 uv run scripts/private_link.py verify --bolt
@@ -191,13 +195,13 @@ Add `--vm <name>` to resolve each host from a VM in the VNet. `--bolt` runs `RET
 
 The notebooks in `pl-notebooks/` run on classic clusters in a VNet-injected workspace, as long as the workspace VNet is linked to the private DNS zone.
 
-**Create the secret scope.** The notebooks read Neo4j credentials from a secret scope named `neo4j` in the workspace. Copy the sample file and fill it in. The URI host is your Aura Private URI host:
+**Create the secret scope.** The notebooks read Neo4j credentials from a secret scope named `neo4j` in the workspace. Create `.env` from the sample file only if it does not exist yet, so you keep the values you already set. Then fill in `WORKSPACE_PROFILE` and the `NEO4J_*` values. The URI host is your Aura Private URI host:
 
 ```bash
-cp env.sample .env
+[ -f .env ] || cp env.sample .env
 ```
 
-`.env` is gitignored. It holds `WORKSPACE_PROFILE` and the `NEO4J_*` values. Then run the script from the repository root. It creates the scope and stores the `uri`, `username`, `password`, and `database` keys. The `database` key is optional, and the notebooks fall back to `neo4j` without it:
+`.env` is gitignored. Run the script from the repository root. It creates the scope and stores the `uri`, `username`, `password`, and `database` keys. The `database` key is optional, and the notebooks fall back to `neo4j` without it:
 
 ```bash
 ./scripts/create-secret-scope.sh

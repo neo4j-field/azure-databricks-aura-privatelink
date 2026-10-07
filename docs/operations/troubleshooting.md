@@ -2,6 +2,8 @@
 
 Entries are grouped by path. **NCC** covers Databricks Serverless. **Private Link** covers a private endpoint in your own VNet. **Both paths** covers Bolt, TLS, public access, and secret scope problems that can happen on either path.
 
+The commands read variables such as `WORKSPACE_PROFILE`, `RG`, and `PE_NAME`. Load them with `source scripts/load-env.sh`, as in [Environment setup](../env-setup.md).
+
 ## NCC (Databricks Serverless)
 
 ### DNS resolves to public IP
@@ -105,7 +107,7 @@ Add a missing link or record as in [Private Link manual setup](../setup-private-
 
 **Symptom:** On the Private Link path, the instance host resolves privately, but your own app, job, neo4j-cli, or Neo4j Desktop fails with `Cannot resolve address p-...neo4j.io:7687`.
 
-The notebooks in this repo never show this error. They install a driver resolver that maps routing hosts back to the instance host, so they pass without routing-host records. Your own apps can copy that resolver from [Neo4j driver cannot resolve `p-*.neo4j.io`](#neo4j-driver-cannot-resolve-p-neo4jio).
+The notebook `pl-notebooks/01_validate_connectivity.py` fails on a missing routing-host record by design. It lists each advertised routing host and prints the `add-routing-host` command for the ones that do not resolve. The driver resolver that hides this is off by default and sits behind the `use_resolver` widget. Your own apps can copy that resolver from [Neo4j driver cannot resolve `p-*.neo4j.io`](#neo4j-driver-cannot-resolve-p-neo4jio), but the records are the real fix.
 
 **Cause:** Routing hosts sit under `<orch>.neo4j.io`, not under `databases.neo4j.io`, so the instance zone never answers for them. Each one needs an A record in its own `<orch>.neo4j.io` zone.
 
@@ -160,10 +162,10 @@ The notebooks in this repo never show this error. They install a driver resolver
 
 **Symptom:** `dbutils.secrets.get` raises `ResourceDoesNotExist`.
 
-**Fix:** Fill in `.env` from `env.sample`, then run the script from the repository root. It creates the `neo4j` scope and stores the `uri`, `username`, `password`, and `database` keys:
+**Fix:** Fill in `.env` from `env.sample`, then run the script from the repository root. It creates the `neo4j` scope and stores the `uri`, `username`, `password`, and `database` keys. The first command creates `.env` only if it does not exist, so it keeps any values you already set:
 
 ```bash
-cp env.sample .env
+[ -f .env ] || cp env.sample .env
 ./scripts/create-secret-scope.sh
 ```
 

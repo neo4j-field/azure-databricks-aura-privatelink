@@ -43,12 +43,18 @@ In the Aura console:
 
 > Private Link in Aura is **region-scoped, not instance-scoped**. Enabling it applies to all instances in the selected region under your tenant.
 
-You now have the two values every setup path needs:
+You now have the two values every setup path needs. Put them in the repo-root `.env`, created with `cp env.sample .env`, and load it:
 
 ```bash
-export AURA_PLS_ALIAS="production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice"
-export AURA_PRIVATE_HOSTNAME="<aura-instance-id>.databases.neo4j.io"
+AURA_PLS_ALIAS="production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice"
+AURA_PRIVATE_HOSTNAME="<aura-instance-id>.databases.neo4j.io"
 ```
+
+```bash
+source scripts/load-env.sh
+```
+
+`AURA_PRIVATE_HOSTNAME` is the host of `NEO4J_URI`, so the loader fills it in when you leave it out. [Environment setup](../env-setup.md) covers every other value.
 
 ## Step 3: Allow-list the consumer subscription
 
@@ -116,7 +122,7 @@ Private Link adds a private path. It does not close the public one. Until you di
 1. Aura → **Project settings → Security & Networking → Private endpoints**
 2. Toggle **Disable public access**
 3. Watch the console until the status shows that public access is disabled. The change takes time to propagate.
-4. Re-run the validation to confirm private-only access still works. See [Validate connectivity for NCC](../setup-ncc-manual.md#validate-connectivity) or [for Private Link](../setup-private-link-manual.md#validate-connectivity)
+4. Re-run the validation to confirm private-only access still works. See [Validate connectivity for NCC](../setup-ncc-manual.md#validate-connectivity) or [for Private Link](../setup-private-link-manual.md#run-the-validation-notebook)
 5. From a machine outside Azure and outside any network linked to your private DNS, confirm the public endpoint is closed. The connection must fail or time out. A success means public access is still on.
 
    ```bash

@@ -10,6 +10,8 @@ Each step shows the Databricks CLI command first. The console or REST alternativ
 
 ## Prerequisites
 
+Every value in this guide lives in the repo-root `.env`. [Environment setup](env-setup.md) says where to find each one and how to load them all with `source scripts/load-env.sh`.
+
 ### Databricks side
 
 | Item | Value |
@@ -40,20 +42,12 @@ Complete [Aura console Steps 1 and 2](shared/aura-console-steps.md) first. They 
 
 ## Step 0: Sign in and collect your values
 
-This step gathers the values that later steps reuse.
+This step signs you in and loads the values that later steps reuse. [Environment setup](env-setup.md) says where to find each value and how the loader works. Only the two sign-in values below are not in `.env`:
 
 | Value | What it is | Where to find it |
 |-------|------------|------------------|
 | `TENANT_ID` | Entra ID tenant that owns the subscription your workspace is deployed in | Azure portal, Microsoft Entra ID, Overview. Or run `az account show --query tenantId -o tsv`. |
 | `SUB_ID` | Azure subscription that holds the workspace | Azure portal, Subscriptions |
-| `WORKSPACE_PROFILE` | Databricks CLI profile name for the workspace | `~/.databrickscfg`, or run `databricks auth profiles` |
-| `WORKSPACE_URL` | Host URL of the workspace | Azure portal, the workspace Overview page |
-| `WORKSPACE_NAME` | Display name of the workspace in the account | Account Console, Workspaces |
-| `ACCOUNT_PROFILE` | Databricks CLI profile name for the account console | A new name, or an existing account-level profile |
-| `DATABRICKS_ACCOUNT_ID` | ID of your Databricks account | Account Console, user menu in the top right corner |
-| `AURA_PLS_ALIAS` | Private Link service name from Aura | [Aura console Step 2](shared/aura-console-steps.md#step-2-enable-private-link-in-aura-network-access-configuration) |
-| `AURA_PRIVATE_HOSTNAME` | Private URI hostname from Aura | [Aura console Step 2](shared/aura-console-steps.md#step-2-enable-private-link-in-aura-network-access-configuration) |
-| `NCC_REGION` | Azure region of the workspace, for example `eastus` | Must match the workspace region exactly |
 
 **Tools.** `az`, the `databricks` CLI, and `jq` must be on PATH.
 
@@ -64,14 +58,17 @@ az login --tenant <TENANT_ID>
 az account set --subscription <SUB_ID>
 ```
 
-**Workspace CLI profile.** The profile must exist and authenticate. Set its name once, along with the workspace URL:
+**Load your values.** Create `.env` from the sample file if it does not exist yet. Fill in the values for the NCC path, as listed in [Which values your path needs](env-setup.md#which-values-your-path-needs). Then load the file. Run the load command again after each edit to `.env`:
 
 ```bash
-export WORKSPACE_PROFILE="<workspace-profile>"
-export WORKSPACE_URL="<workspace-url>"
+[ -f .env ] || cp env.sample .env
+source scripts/load-env.sh
+printenv WORKSPACE_PROFILE WORKSPACE_URL WORKSPACE_NAME ACCOUNT_PROFILE DATABRICKS_ACCOUNT_ID AURA_PLS_ALIAS AURA_PRIVATE_HOSTNAME NCC_REGION
 ```
 
-Then check that it authenticates:
+`AURA_PRIVATE_HOSTNAME` is the host of `NEO4J_URI`, so the loader fills it in unless you set it yourself.
+
+**Workspace CLI profile.** The profile must exist and authenticate. Check it:
 
 ```bash
 databricks --profile "$WORKSPACE_PROFILE" current-user me
@@ -83,16 +80,7 @@ If it reports stored credentials from an older CLI version, sign in again:
 databricks auth login --host "$WORKSPACE_URL" --profile "$WORKSPACE_PROFILE"
 ```
 
-**Account-console CLI profile.** NCC calls target `accounts.azuredatabricks.net`, which is a different auth context from the workspace. Find `DATABRICKS_ACCOUNT_ID` in the Account Console by opening the user menu in the top right corner. Set both values once. Every later command in this guide reuses them:
-
-```bash
-export ACCOUNT_PROFILE="<account-profile>"
-export DATABRICKS_ACCOUNT_ID="<databricks-account-id>"
-```
-
-`ACCOUNT_PROFILE` must be an account-level profile, never a workspace profile, or the login fails with a host conflict.
-
-Sign in once to create the profile:
+**Account-console CLI profile.** NCC calls target `accounts.azuredatabricks.net`, which is a different auth context from the workspace. `ACCOUNT_PROFILE` must be an account-level profile, never a workspace profile, or the login fails with a host conflict. Sign in once to create the profile:
 
 ```bash
 databricks auth login --host https://accounts.azuredatabricks.net \
@@ -107,23 +95,14 @@ databricks --profile "$ACCOUNT_PROFILE" account network-connectivity list-networ
 
 Any JSON list counts as a pass. Check that each entry shows the `account_id` from the login command above. An auth or permission error means the profile cannot reach the account console. The NCCs listed are existing ones in the account, including expired rules and rules that belong to other people. Leave them alone, because this guide creates its own NCC.
 
-**Collect the remaining values.** Set the Aura values and region from the table above:
+Look up the workspace ID. The loader reads it from the account workspace list, using `ACCOUNT_PROFILE` and `WORKSPACE_NAME`:
 
 ```bash
-export AURA_PLS_ALIAS="production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice"
-export AURA_PRIVATE_HOSTNAME="<aura-instance-id>.databases.neo4j.io"
-export NCC_REGION="<azure-region>"
-export WORKSPACE_NAME="<workspace-name>"
-```
-
-Look up the workspace ID:
-
-```bash
-export WORKSPACE_ID="$(databricks --profile "$ACCOUNT_PROFILE" account workspaces list -o json \
-  | jq -r --arg ws "$WORKSPACE_NAME" '.[] | select(.workspace_name==$ws) | .workspace_id')"
-: "${WORKSPACE_ID:?No workspace named ${WORKSPACE_NAME} in this account. Check the name in Account Console, Workspaces.}"
+LOAD_ENV_LOOKUP=1 source scripts/load-env.sh
 echo "$WORKSPACE_ID"
 ```
+
+An empty value means no workspace named `WORKSPACE_NAME` exists in this account. Check the name in Account Console, Workspaces.
 
 ## Step 1: Create the NCC
 
@@ -315,13 +294,7 @@ Run these checks after the rule reads `ESTABLISHED` in [Step 5](#step-5-check-th
 
 ### Create the secret scope
 
-The notebooks read Neo4j credentials from a secret scope named `neo4j` in the workspace. Copy the sample file and fill it in. The URI host must match the Private URI host you gave the rule in [Step 3](#step-3-create-the-private-endpoint-rule):
-
-```bash
-cp env.sample .env
-```
-
-`.env` is gitignored. It holds `WORKSPACE_PROFILE` and the `NEO4J_*` values. Then run the script from the repository root. It creates the scope and stores the `uri`, `username`, `password`, and `database` keys:
+The notebooks read Neo4j credentials from a secret scope named `neo4j` in the workspace. Fill in the `NEO4J_*` values in the `.env` you created in [Step 0](#step-0-sign-in-and-collect-your-values). The URI host must match the Private URI host you gave the rule in [Step 3](#step-3-create-the-private-endpoint-rule). `.env` is gitignored. Then run the script from the repository root. It creates the scope and stores the `uri`, `username`, `password`, and `database` keys:
 
 ```bash
 ./scripts/create-secret-scope.sh
@@ -329,7 +302,7 @@ cp env.sample .env
 
 ### Upload the notebooks
 
-Run this from the repository root. It copies the four notebooks into `/Users/<your-user-name>/neo4j-privatelink` in the workspace. The snippet reads `WORKSPACE_PROFILE` from your shell, as exported in [Step 0](#step-0-sign-in-and-collect-your-values):
+Run this from the repository root. It copies the four notebooks into `/Users/<your-user-name>/neo4j-privatelink` in the workspace. The snippet reads `WORKSPACE_PROFILE` from your shell, as loaded in [Step 0](#step-0-sign-in-and-collect-your-values):
 
 ```bash
 : "${WORKSPACE_PROFILE:?WORKSPACE_PROFILE is not set}"

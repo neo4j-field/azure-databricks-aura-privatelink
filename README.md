@@ -38,6 +38,8 @@ The diagram shows the NCC path from Databricks Serverless. [docs/architecture.md
 
 > Private Link is **not available** on Aura Professional or Business Critical on Azure. Verify your tier before starting.
 
+Every guide uses the same variables, kept in a repo-root `.env`. Copy `env.sample` to `.env`, fill it in, and load it with `source scripts/load-env.sh`. [Environment setup](docs/env-setup.md) says where to find each value.
+
 ---
 
 ## Choose your setup
@@ -61,7 +63,7 @@ Pick the row that matches **what reaches Aura**, then the column that matches **
 
 The guides call the two paths NCC and Private Link. The Terraform folders for them are the **NCC stack** (`databricks-ncc`) and the **Private Endpoint stack** (`azure-private-endpoint`).
 
-The Aura console has no API, so its steps are manual in every path. They are collected in [Aura console steps](docs/shared/aura-console-steps.md): provision Aura, enable Private Link, allow-list the consumer subscription, approve the endpoint, and disable public access. Every guide ends with the same follow-up steps: validate connectivity, close the public endpoint, teardown, and what's next. The NCC guides and the Private Link Terraform guide give each step its own section. The Private Link manual guide groups them under [After setup: what comes next for both options](docs/setup-private-link-manual.md#after-setup-what-comes-next-for-both-options), with an extra step to add routing-host records. Each path validates in its own guide: [NCC](docs/setup-ncc-manual.md#validate-connectivity) and [Private Link](docs/setup-private-link-manual.md#validate-connectivity).
+The Aura console has no API, so its steps are manual in every path. They are collected in [Aura console steps](docs/shared/aura-console-steps.md): provision Aura, enable Private Link, allow-list the consumer subscription, approve the endpoint, and disable public access. Every guide ends with the same follow-up steps: validate connectivity, close the public endpoint, teardown, and what's next. The NCC guides and the Private Link Terraform guide give each step its own section. The Private Link manual guide groups them under [Databricks setup and validation](docs/setup-private-link-manual.md#databricks-setup-and-validation), with an extra step to add routing-host records. Each path validates in its own guide: [NCC](docs/setup-ncc-manual.md#validate-connectivity) and [Private Link](docs/setup-private-link-manual.md#run-the-validation-notebook).
 
 ---
 
@@ -86,6 +88,7 @@ The Aura console has no API, so its steps are manual in every path. They are col
 ├── docs/
 │   ├── README.md                                   # Docs index
 │   ├── architecture.md                             # Detailed architecture and rationale
+│   ├── env-setup.md                                # Where to find each environment variable, and how to load .env
 │   ├── setup-ncc-manual.md                         # NCC setup by hand with the Databricks CLI or REST
 │   ├── setup-ncc-terraform.md                      # NCC setup with Terraform and scripts/automate.py
 │   ├── setup-private-link-manual.md                # Private Endpoint and DNS setup by hand with the Azure CLI
@@ -123,7 +126,9 @@ The Aura console has no API, so its steps are manual in every path. They are col
 ├── scripts/
 │   ├── automate.py                                 # Orchestrator for the NCC Terraform setup
 │   ├── private_link.py                             # Private Endpoint and DNS setup with the Azure CLI, with --dry-run and verify --bolt
+│   ├── databricks_vnet_workspace.py                # Create or delete a VNet-injected workspace for the Private Link path
 │   ├── private_link_testbed.py                     # Throwaway stand-in Aura PLS for testing private_link.py
+│   ├── load-env.sh                                 # Source it to load .env into your shell (bash or zsh)
 │   ├── create-secret-scope.sh                      # Databricks secret scope setup
 │   ├── create-private-endpoint-rule.sh             # REST API fallback for the NCC PE rule
 │   └── validate-dns.py                             # Standalone DNS check

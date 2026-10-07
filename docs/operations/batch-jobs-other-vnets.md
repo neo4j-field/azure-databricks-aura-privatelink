@@ -2,6 +2,8 @@
 
 This guide applies to the Private Link path, where a private endpoint sits in your own VNet. When public access is disabled on Aura, a workload in a VNet that is not linked to the private DNS zone for `databases.neo4j.io` resolves the Aura hostname through public DNS. It receives the public IP, and Aura refuses the connection.
 
+The commands use `RG` and `PE_IP` from setup. Load them with `source scripts/load-env.sh`, as in [Environment setup](../env-setup.md).
+
 The fixes below restore connectivity for Azure workloads in other VNets. Affected workloads include classic Databricks clusters, Azure Data Factory, Azure Kubernetes Service, Azure Machine Learning compute clusters, Azure Functions, and any VM-based batch process.
 
 ---

@@ -2,7 +2,7 @@
 
 A private endpoint gives you a private IP inside your subnet. On its own, nothing connects the Aura hostname to that IP. By default `<aura-instance-id>.databases.neo4j.io` resolves to the Aura public IP. A private DNS zone overrides that answer inside your network, so the hostname resolves to the endpoint private IP instead.
 
-Both Private Link guides use this page: [Private Link manual setup](../setup-private-link-manual.md) and [Private Link Terraform setup](../setup-private-link-terraform.md).
+Both Private Link guides use this page: [Private Link manual setup](../setup-private-link-manual.md) and [Private Link Terraform setup](../setup-private-link-terraform.md). The variables on this page are described in [Environment setup](../env-setup.md).
 
 ## Why databases.neo4j.io lives in your private DNS zone
 
@@ -43,12 +43,10 @@ Then wire DNS in the hub as in [Set up central hub DNS](#set-up-central-hub-dns)
 
 These steps use the Azure CLI. The portal equivalents live under **Private DNS zones** and **DNS Private Resolver**. The same objects map to your own Terraform or Bicep if the hub is codified. These steps replace Steps 5 and 6 of the manual guide.
 
-Set the hub values:
+Set `HUB_RG`, the resource group that owns the private DNS zones, in `.env`. `AURA_INSTANCE_ID` is the first label of the Aura hostname, so `abcd1234` for `abcd1234.databases.neo4j.io`. The loader takes it from `NEO4J_URI` and sets `ZONE` to `databases.neo4j.io`, so you only need to set them in `.env` to override those values. Then load the file:
 
 ```bash
-export HUB_RG="<hub-resource-group>"           # owns the private DNS zones
-export ZONE="databases.neo4j.io"
-export AURA_INSTANCE_ID="<aura-instance-id>"   # the label only, for example abcd1234
+source scripts/load-env.sh
 ```
 
 Read the endpoint private IP into `PE_IP`. On the Terraform path, run this from `infra/terraform/azure-private-endpoint` after `terraform apply`:
@@ -110,12 +108,11 @@ az network private-dns record-set a add-record \
 
 Aura VDC returns Bolt routing addresses that look like `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io`. The `ncc-notebooks/` set maps those hosts back to the instance host, so it passes without these records. The `pl-notebooks/` set uses plain DNS by default, so it fails until they exist. A client without such a resolver reports `Cannot resolve address p-...neo4j.io:7687`, and the error names the host. Your own apps and jobs, `neo4j-cli`, and Neo4j Desktop are examples of such clients.
 
-Routing hosts sit under `<orch>.neo4j.io`, not under `databases.neo4j.io`, so they need their own zone in the hub. Set the host from the error message, then derive the zone and the record name from it:
+Routing hosts sit under `<orch>.neo4j.io`, not under `databases.neo4j.io`, so they need their own zone in the hub. Set `ROUTING_HOST` in `.env` from the error message, for example `ROUTING_HOST="p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"`. The loader derives the zone and the record name from it. `ORCH_ZONE` is everything after the first label, and `ROUTING_LABEL` is the first label:
 
 ```bash
-export ROUTING_HOST="p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"
-export ORCH_ZONE="${ROUTING_HOST#*.}"       # everything after the first label
-export ROUTING_LABEL="${ROUTING_HOST%%.*}"  # the first label
+source scripts/load-env.sh
+echo "$ORCH_ZONE $ROUTING_LABEL"
 ```
 
 Create the zone in the hub and link it to every consuming VNet, as in Step 2:
@@ -161,4 +158,4 @@ nslookup "$ROUTING_HOST"                            # each routing host, same pr
 
 A public address means the VNet is not linked to the hub zone, or the resolver forwarding rule is missing. Revisit Step 2.
 
-Then open a Bolt connection with `neo4j+s://<aura-instance-id>.databases.neo4j.io` from a Neo4j client in the linked VNet. Continue with the rest of Validate connectivity in the [manual guide](../setup-private-link-manual.md#validate-connectivity) or the [Terraform guide](../setup-private-link-terraform.md#validate-connectivity).
+Then open a Bolt connection with `neo4j+s://<aura-instance-id>.databases.neo4j.io` from a Neo4j client in the linked VNet. Continue with the rest of Validate connectivity in the [manual guide](../setup-private-link-manual.md#run-the-validation-notebook) or the [Terraform guide](../setup-private-link-terraform.md#validate-connectivity).

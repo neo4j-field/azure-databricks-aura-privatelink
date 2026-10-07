@@ -2,6 +2,8 @@
 
 Pick the section for the path you used, then finish with the [Aura-side cleanup](#aura-side-cleanup-manual-no-api). The Aura console has no API, so that cleanup is always manual.
 
+The commands reuse the variables from setup. Load them with `source scripts/load-env.sh`, as in [Environment setup](../env-setup.md).
+
 | Path | Section |
 |------|---------|
 | NCC, Terraform or manual | [NCC (Databricks Serverless)](#ncc-databricks-serverless) |
@@ -44,7 +46,7 @@ export ORIGINAL_NCC_ID="$NCC_ID"
 
 The workspace must always point at *some* NCC, so free the original by pointing the workspace at an empty placeholder instead. The placeholder's region **must match the workspace region**. An NCC only binds to a workspace in its own region.
 
-The commands reuse `ACCOUNT_PROFILE`, `WORKSPACE_ID`, and `NCC_REGION` from [NCC manual setup Step 0](../setup-ncc-manual.md#step-0-sign-in-and-collect-your-values). Create the placeholder NCC, then swap the workspace onto it:
+The commands reuse `ACCOUNT_PROFILE`, `WORKSPACE_ID`, and `NCC_REGION` from [NCC manual setup Step 0](../setup-ncc-manual.md#step-0-sign-in-and-collect-your-values). In a fresh shell, run `LOAD_ENV_LOOKUP=1 source scripts/load-env.sh` to set `WORKSPACE_ID` again. Create the placeholder NCC, then swap the workspace onto it:
 
 ```bash
 export PLACEHOLDER_NCC_ID="$(databricks --profile "$ACCOUNT_PROFILE" account network-connectivity \

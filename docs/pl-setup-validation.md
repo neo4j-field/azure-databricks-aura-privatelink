@@ -162,9 +162,9 @@ databricks workspace import-dir pl-notebooks /Shared/aura-privatelink-pl --overw
 databricks workspace list /Shared/aura-privatelink-pl --profile azure-vnet-injected
 ```
 
-## 8. Run the validation
+## 8. Find the private endpoint IP
 
-Get the private endpoint IP so the notebook can check the exact address:
+The notebooks check that the Aura host resolves to this exact address. It is the IP of the private endpoint network interface.
 
 ```bash
 export PE_NAME=$(az network private-endpoint list -g rg-aura-pl-test --query "[0].name" -o tsv)
@@ -172,58 +172,53 @@ export PE_IP=$(az network nic show --ids "$(az network private-endpoint show -g 
 echo "$PE_NAME $PE_IP"
 ```
 
-Run `01_validate_connectivity.py` with the resolver off. It is expected to fail on routing hosts until their records exist.
+Expected: `pe-b7253d3b-uksouth 10.10.1.4`. `uv run scripts/private_link.py verify` also prints it as `endpoint IP`.
+
+## 9. Run the validation in the workspace
+
+The notebooks are already in the workspace at `/Shared/aura-privatelink-pl/`. Run them there, not from the CLI.
+
+1. Open the workspace URL.
+
+   ```bash
+   echo "$WS_URL"
+   ```
+
+2. Open **Workspace > Shared > aura-privatelink-pl > 01_validate_connectivity**.
+3. In the compute dropdown at the top, attach the cluster `pl-test`. It must show `RUNNING`.
+4. Fill in the widgets at the top of the notebook. Use the IP from step 8.
+   - `expected_pe_ip`: the value of `$PE_IP`, for example `10.10.1.4`
+   - `use_resolver`: `false`
+5. Click **Run all**.
+
+Passing means every cell finishes and the last cell prints that the check passed. Before the routing-host records exist, the routing-host cell fails and lists each host. That is the expected first result, so go to step 10.
+
+Databricks masks the word `neo4j` in cell output as `[REDACTED]`, because the `username` and `database` secrets are both `neo4j`. A host such as `p-b7253d3b-a464-0009.production-orch-0477.[REDACTED].io` really ends in `.neo4j.io`.
+
+## 10. Add routing-host records if step 9 failed on them
+
+Run one command per failing host. These are the three hosts from the first run. Check the host names against the notebook output, replacing `[REDACTED]` with `neo4j`.
 
 ```bash
-databricks jobs submit --profile azure-vnet-injected --json "{
-  \"run_name\": \"pl-01-validate\",
-  \"tasks\": [{
-    \"task_key\": \"validate\",
-    \"existing_cluster_id\": \"$CLUSTER_ID\",
-    \"notebook_task\": {
-      \"notebook_path\": \"/Shared/aura-privatelink-pl/01_validate_connectivity\",
-      \"base_parameters\": {\"expected_pe_ip\": \"$PE_IP\", \"use_resolver\": \"false\"}
-    }
-  }]
-}" -o json | tee /tmp/pl-01-run.json | jq '{state: .state.result_state, message: .state.state_message, tasks: [.tasks[] | {run_id, url: .run_page_url, result: .state.result_state}]}'
+uv run scripts/private_link.py add-routing-host "p-b7253d3b-a464-0009.production-orch-0477.neo4j.io"
+uv run scripts/private_link.py add-routing-host "p-b7253d3b-a464-0010.production-orch-0477.neo4j.io"
+uv run scripts/private_link.py add-routing-host "p-b7253d3b-a464-0011.production-orch-0477.neo4j.io"
 ```
 
-Get the error text if it failed:
-
-```bash
-databricks jobs get-run-output "$(jq -r '.tasks[0].run_id' /tmp/pl-01-run.json)" --profile azure-vnet-injected -o json | jq -r '.error, .error_trace' | head -60
-```
-
-## 9. Add routing-host records if step 8 failed on them
-
-The error lists each failing host and the exact command. Run it once per host:
-
-```bash
-uv run scripts/private_link.py add-routing-host "p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"
-```
-
-Restart the cluster so it drops cached DNS answers, then repeat step 8.
+Restart the cluster so it drops cached DNS answers. Wait for `RUNNING`.
 
 ```bash
 databricks clusters restart "$CLUSTER_ID" --profile azure-vnet-injected
 databricks clusters get "$CLUSTER_ID" --profile azure-vnet-injected -o json | jq -r '.state'
 ```
 
-## 10. Run the push and pull demo
+Then run `01_validate_connectivity` again, with the same widget values. It should pass.
 
-```bash
-databricks jobs submit --profile azure-vnet-injected --json "{
-  \"run_name\": \"pl-03-push-pull\",
-  \"tasks\": [{
-    \"task_key\": \"demo\",
-    \"existing_cluster_id\": \"$CLUSTER_ID\",
-    \"notebook_task\": {
-      \"notebook_path\": \"/Shared/aura-privatelink-pl/03_push_pull_demo\",
-      \"base_parameters\": {\"use_resolver\": \"false\"}
-    }
-  }]
-}" -o json | jq '{state: .state.result_state, message: .state.state_message}'
-```
+Run the other notebooks in this order, attached to `pl-test`:
+
+1. `04_smoke_test`: same two widgets as `01`. It needs no tables.
+2. `03_push_pull_demo`: set `use_resolver` to `false`. It needs no tables.
+3. `02_delta_to_neo4j`: it expects a Unity Catalog catalog named `pldemo`. Create that catalog, or change `CATALOG` near the top of the notebook to `dbx_aura_pl_test`.
 
 ## 11. Tear down when finished
 

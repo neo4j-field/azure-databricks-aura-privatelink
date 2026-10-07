@@ -96,6 +96,18 @@ For a CLI-first version of the Databricks steps, see [docs/manual-ncc-setup.md](
 - Adding a routing hostname such as `p-<aura-id>-<suffix>.<orch>.neo4j.io` to an existing rule.
 - Deleting and recreating an expired or failed rule.
 
+**Private Link, without Terraform.** For a consumer in your own VNet, see [docs/private-link-manual-setup.md](docs/private-link-manual-setup.md). It is the counterpart of the NCC guide. It creates the private endpoint and the private DNS with the Azure CLI.
+
+[`scripts/private_link.py`](scripts/private_link.py) runs the same `az` commands as that guide. It is re-entrant and prints each command before it runs.
+
+```bash
+uv run scripts/private_link.py run --dry-run
+```
+
+`--dry-run` changes nothing. It shows what exists and what a real run would create, update, or delete. After the endpoint is approved, `verify --bolt` runs a `RETURN 1` test through `neo4j-cli`.
+
+[`scripts/private_link_testbed.py`](scripts/private_link_testbed.py) builds a throwaway stand-in for the Aura Private Link service. Use it to test `private_link.py` without Aura. Its commands are `up`, `approve`, `env`, and `down`.
+
 ## Setup Steps (Validated)
 
 ### Step 0: Sign in and collect your values
@@ -389,6 +401,7 @@ To remove the Databricks side, follow [docs/teardown.md](docs/teardown.md). It c
 │   ├── troubleshooting.md                          # Common issues and fixes
 │   ├── automate-tf-ncc-setup.md                    # Operator steps for scripts/automate.py
 │   ├── manual-ncc-setup.md                         # NCC setup by hand with the Databricks CLI or REST
+│   ├── private-link-manual-setup.md                # Private Endpoint and DNS setup by hand with the Azure CLI
 │   ├── teardown.md                                 # Remove the Databricks side and Aura cleanup
 │   ├── developer-desktop-access.md                 # Neo4j Desktop / browser access after public traffic disabled
 │   ├── batch-jobs-other-vnets.md                   # Private Link connectivity for workloads in other VNets
@@ -408,6 +421,8 @@ To remove the Databricks side, follow [docs/teardown.md](docs/teardown.md). It c
 │       └── jumpbox/                                # Azure Bastion + jump box VM for developer desktop access
 ├── scripts/
 │   ├── automate.py                                 # Orchestrator for the NCC stack setup (see docs/automate-tf-ncc-setup.md)
+│   ├── private_link.py                             # Private Endpoint and DNS setup with the Azure CLI, with --dry-run and verify --bolt
+│   ├── private_link_testbed.py                     # Throwaway stand-in Aura PLS for testing private_link.py
 │   ├── create-secret-scope.sh                      # Databricks secret scope setup
 │   ├── create-private-endpoint-rule.sh             # REST API fallback for the NCC PE rule
 │   └── validate-dns.py                             # Standalone DNS check

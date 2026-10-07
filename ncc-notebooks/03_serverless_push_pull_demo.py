@@ -65,7 +65,7 @@ display(push_df)
 # MAGIC
 # MAGIC 20 rows comfortably fits in one transaction, so we collect on the driver
 # MAGIC and write once. For larger sets, switch to `foreachPartition` with batches
-# MAGIC of 1k-10k rows (see `notebooks/02_delta_to_neo4j.py`).
+# MAGIC of 1k-10k rows (see `ncc-notebooks/02_delta_to_neo4j.py`).
 
 # COMMAND ----------
 

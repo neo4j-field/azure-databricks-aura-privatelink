@@ -39,7 +39,7 @@ Usage:
 
 `run` flags:
   --no-apply                Skip `terraform apply`; only read `terraform output -json`.
-  --notebook PATH           Validation notebook (default: notebooks/01_validate_connectivity.py).
+  --notebook PATH           Validation notebook (default: ncc-notebooks/01_validate_connectivity.py).
   --poll-timeout N          Seconds to wait for the rule to reach ESTABLISHED (default: 600).
   --poll-interval N         Seconds between rule status polls (default: 15).
   --run-timeout N           Minutes to wait for the validation run to finish (default: 30).
@@ -68,7 +68,7 @@ from dotenv import load_dotenv
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TERRAFORM_DIR = REPO_ROOT / "infra" / "terraform" / "databricks-ncc"
-DEFAULT_NOTEBOOK = REPO_ROOT / "notebooks" / "01_validate_connectivity.py"
+DEFAULT_NOTEBOOK = REPO_ROOT / "ncc-notebooks" / "01_validate_connectivity.py"
 WORKSPACE_NOTEBOOK_DIR = "/Shared/aura-privatelink"
 
 SECRET_SCOPE = "neo4j"

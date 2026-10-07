@@ -335,7 +335,7 @@ Run this from the repository root. It copies the four notebooks into `/Users/<yo
 : "${WORKSPACE_PROFILE:?WORKSPACE_PROFILE is not set}"
 export NOTEBOOK_DIR="/Users/$(databricks --profile "$WORKSPACE_PROFILE" current-user me -o json | jq -r .userName)/neo4j-privatelink"
 databricks --profile "$WORKSPACE_PROFILE" workspace mkdirs "$NOTEBOOK_DIR"
-for f in notebooks/0*.py; do
+for f in ncc-notebooks/0*.py; do
   databricks --profile "$WORKSPACE_PROFILE" workspace import "$NOTEBOOK_DIR/$(basename "$f" .py)" \
     --file "$f" --format SOURCE --language PYTHON --overwrite
 done
@@ -347,10 +347,10 @@ Open the `neo4j-privatelink` folder in the workspace and attach each notebook to
 
 Run the notebooks from the uploaded folder, starting with 01:
 
-- [notebooks/01_validate_connectivity.py](../notebooks/01_validate_connectivity.py) checks the private path. It resolves the Aura host, asserts the address is private, and then runs the Bolt connectivity check.
-- [notebooks/02_delta_to_neo4j.py](../notebooks/02_delta_to_neo4j.py) runs a Delta round trip. It reads a Delta table, writes it to Neo4j with batched `UNWIND` and `MERGE`, and writes query results back to Delta.
-- [notebooks/03_serverless_push_pull_demo.py](../notebooks/03_serverless_push_pull_demo.py) is a small demo. It pushes a Spark DataFrame into Aura and pulls aggregates back.
-- [notebooks/04_smoke_test.py](../notebooks/04_smoke_test.py) is the fuller end-to-end test. It writes 100 sample rows, reads them back, checks the counts, and cleans up. It repeats the same DNS assertion as 01.
+- [ncc-notebooks/01_validate_connectivity.py](../ncc-notebooks/01_validate_connectivity.py) checks the private path. It resolves the Aura host, asserts the address is private, and then runs the Bolt connectivity check.
+- [ncc-notebooks/02_delta_to_neo4j.py](../ncc-notebooks/02_delta_to_neo4j.py) runs a Delta round trip. It reads a Delta table, writes it to Neo4j with batched `UNWIND` and `MERGE`, and writes query results back to Delta.
+- [ncc-notebooks/03_serverless_push_pull_demo.py](../ncc-notebooks/03_serverless_push_pull_demo.py) is a small demo. It pushes a Spark DataFrame into Aura and pulls aggregates back.
+- [ncc-notebooks/04_smoke_test.py](../ncc-notebooks/04_smoke_test.py) is the fuller end-to-end test. It writes 100 sample rows, reads them back, checks the counts, and cleans up. It repeats the same DNS assertion as 01.
 
 DNS resolution for the Aura Private URI is handled by Databricks NCC because you supplied `domain_names` in [Step 3](#step-3-create-the-private-endpoint-rule). Notebook 01 checks it for you, so no separate DNS check is needed.
 

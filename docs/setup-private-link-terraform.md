@@ -88,7 +88,7 @@ To choose between the modes, see [Self-managed vs. central DNS](shared/private-d
 
 Aura VDC returns Bolt routing addresses after the first connection. They look like `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io`, where `<orch>` is a label such as `production-orch-<id>`. These hosts sit under `<orch>.neo4j.io`, not under `databases.neo4j.io`. A record in the `databases.neo4j.io` zone never matches them, so each one needs its own record in a separate zone. This stack does not create these records.
 
-The notebooks in this repository map routing hosts back to the instance host, so they never need these records. Clients without such a resolver do need them. Examples are your own apps and jobs, `neo4j-cli`, Neo4j Desktop, and drivers elsewhere. Such a client reports `Cannot resolve address p-...neo4j.io:7687`, and the error names the host. `private_link.py verify --bolt` runs `neo4j-cli`, so it surfaces missing hosts too.
+The `ncc-notebooks/` set maps routing hosts back to the instance host, so it never needs these records. The `pl-notebooks/` set does not, unless you turn on its `use_resolver` widget. Clients without such a resolver do need them. Examples are your own apps and jobs, `neo4j-cli`, Neo4j Desktop, and drivers elsewhere. Such a client reports `Cannot resolve address p-...neo4j.io:7687`, and the error names the host. `private_link.py verify --bolt` runs `neo4j-cli`, so it surfaces missing hosts too. `pl-notebooks/01_validate_connectivity.py` lists every advertised routing host and prints the command for each one that lacks a record.
 
 The steps below cover the single-VNet mode. With central hub DNS, add the records in the hub as in [Add routing-host records when a client needs them](shared/private-dns-central.md#step-4-add-routing-host-records-when-a-client-needs-them).
 
@@ -101,7 +101,7 @@ export VNET_RG="<vnet-resource-group>"    # vnet_resource_group_name, or the sam
 export PE_NAME="<private-endpoint-name>"  # private_endpoint_name
 ```
 
-**Script.** Run this once for each host a client reports. It creates the zone and the link the first time and adds one A record each time:
+**Script.** The script reads `RG`, `VNET`, `VNET_RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the repo-root `.env`, not from the variables above. Add the same values there. Run this once for each host a client reports. It creates the zone and the link the first time and adds one A record each time:
 
 ```bash
 uv run ../../../scripts/private_link.py add-routing-host "p-<aura-instance-id>-<suffix>.<orch>.neo4j.io"
@@ -173,7 +173,7 @@ The `nslookup` answer must be the endpoint private IP. A public address means th
 
 ### Run a Bolt query
 
-**Script.** [`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the values you exported above. Run it from the repository root:
+**Script.** [`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the repo-root `.env`, so add the same three values there. Run it from the repository root:
 
 ```bash
 uv run scripts/private_link.py verify --bolt
@@ -189,7 +189,7 @@ Add `--vm <name>` to resolve each host from a VM in the VNet. `--bolt` runs `RET
 
 ### Classic Databricks clusters
 
-The notebooks also run on classic clusters in a VNet-injected workspace, as long as the workspace VNet is linked to the private DNS zone.
+The notebooks in `pl-notebooks/` run on classic clusters in a VNet-injected workspace, as long as the workspace VNet is linked to the private DNS zone.
 
 **Create the secret scope.** The notebooks read Neo4j credentials from a secret scope named `neo4j` in the workspace. Copy the sample file and fill it in. The URI host is your Aura Private URI host:
 
@@ -209,7 +209,7 @@ cp env.sample .env
 : "${WORKSPACE_PROFILE:?WORKSPACE_PROFILE is not set}"
 export NOTEBOOK_DIR="/Users/$(databricks --profile "$WORKSPACE_PROFILE" current-user me -o json | jq -r .userName)/neo4j-privatelink"
 databricks --profile "$WORKSPACE_PROFILE" workspace mkdirs "$NOTEBOOK_DIR"
-for f in notebooks/0*.py; do
+for f in pl-notebooks/0*.py; do
   databricks --profile "$WORKSPACE_PROFILE" workspace import "$NOTEBOOK_DIR/$(basename "$f" .py)" \
     --file "$f" --format SOURCE --language PYTHON --overwrite
 done
@@ -219,7 +219,14 @@ Open the `neo4j-privatelink` folder in the workspace and attach each notebook to
 
 **Restart running clusters after DNS changes.** A cluster that resolved the host before the record existed can keep the public answer cached. Restart it after you create or change any A record or zone link.
 
-Run [notebooks/01_validate_connectivity.py](../notebooks/01_validate_connectivity.py). It asserts that the Aura host resolves to a private address. On this path a public answer points to the zone link or the A record, not to an NCC rule. The notebooks map routing hosts back to the instance host, so they pass without routing-host records.
+Run [pl-notebooks/01_validate_connectivity.py](../pl-notebooks/01_validate_connectivity.py). It checks four things in order:
+
+1. The Aura host resolves to a private address. Set the `expected_pe_ip` widget to the endpoint IP to pin the exact address. A public answer points to the zone link or the A record, not to an NCC rule.
+2. TCP reaches the Bolt port.
+3. Every routing host that Aura advertises resolves to the endpoint. A host without a record fails, and the notebook prints the `add-routing-host` command for it.
+4. A Bolt query succeeds with plain DNS.
+
+The notebook maps routing hosts back to the instance host only when you set the `use_resolver` widget to `true`. That workaround hides missing records, so use it only to compare. [pl-notebooks/04_smoke_test.py](../pl-notebooks/04_smoke_test.py) repeats the DNS and routing-host checks and adds a 100-row write and read-back.
 
 ## Close the public endpoint
 

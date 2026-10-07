@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = [
+#     "python-dotenv>=1.0",
+# ]
 # ///
 """
 private_link.py - set up Azure Private Link to Neo4j Aura with the Azure CLI, no Terraform.
@@ -18,8 +20,20 @@ Auth is the Azure CLI session:
   az login --tenant <tenant-id>
   az account set --subscription <subscription-id>
 
-Settings come from flags or from the same environment variables the manual doc
-exports: RG, VNET, VNET_RG, PE_SUBNET, PE_NAME, AURA_PLS_ALIAS, AURA_INSTANCE_ID.
+Settings come only from the repo-root .env file. There are no flags for them and
+exported shell variables are ignored: RG, VNET, VNET_RG, PE_SUBNET, PE_NAME,
+AURA_PLS_ALIAS, AURA_INSTANCE_ID, WORKSPACE_NAME, REQUEST_MESSAGE.
+Only AURA_PLS_ALIAS has no default. The script fills in the rest when unset:
+  AURA_INSTANCE_ID  the first label of NEO4J_URI
+  VNET, VNET_RG     the custom VNet of a VNet-injected Databricks workspace. Set
+                    WORKSPACE_NAME to pick one, otherwise the script
+                    lists the workspaces in the subscription and asks.
+  RG                VNET_RG
+  PE_SUBNET         a subnet in VNET that is not delegated. It asks if there are several,
+                    and marks the likeliest one as the default.
+  PE_NAME           an existing pe-<instance-id>-* endpoint in RG, else
+                    pe-<instance-id>-<VNet region>
+When it cannot ask because stdin is not a terminal, it stops and lists the options.
 
 Every command is re-entrant. It inspects what exists and only changes the difference.
 
@@ -54,7 +68,6 @@ Usage:
 import argparse
 import ipaddress
 import json
-import os
 import shlex
 import shutil
 import socket
@@ -62,10 +75,25 @@ import subprocess
 import sys
 import time
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import urlparse
 
+from dotenv import dotenv_values
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 ZONE = "databases.neo4j.io"
+ENV_KEYS = {
+    "resource_group": "RG",
+    "vnet": "VNET",
+    "vnet_resource_group": "VNET_RG",
+    "subnet": "PE_SUBNET",
+    "name": "PE_NAME",
+    "pls_alias": "AURA_PLS_ALIAS",
+    "instance_id": "AURA_INSTANCE_ID",
+}
+WORKSPACE_TYPE = "Microsoft.Databricks/workspaces"
+RESERVED_SUBNETS = {"GatewaySubnet", "AzureFirewallSubnet", "AzureBastionSubnet"}
 DNS_TTL = "30"
 BOLT_PORT = 7687
 STATUS_APPROVED = "Approved"
@@ -100,12 +128,18 @@ class Settings:
     pls_alias: str | None
     instance_id: str | None
     request_message: str
+    workspace: str | None = None
+    notes: list[str] = field(default_factory=list)
 
     def require(self, *fields: str) -> None:
         missing = [f for f in fields if not getattr(self, f)]
         if missing:
-            flags = ", ".join("--" + f.replace("_", "-") for f in missing)
-            raise SystemExit(f"error: missing required setting: {flags}")
+            keys = ", ".join(ENV_KEYS[f] for f in missing)
+            raise SystemExit(f"error: missing required setting in .env: {keys}")
+
+    def found(self, label: str, value: str, source: str) -> None:
+        """Record a setting the script filled in, so the run can print it."""
+        self.notes.append(f"{label:<10} {value}  ({source})")
 
     @property
     def vnet_rg(self) -> str | None:
@@ -188,6 +222,225 @@ def az_tsv(*args: str) -> str:
 
 def az_exists(*args: str) -> bool:
     return az(*args, "-o", "none", check=False).returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# Discovery: fill in settings left unset
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class Workspace:
+    name: str
+    resource_group: str
+    vnet_id: str | None
+
+
+def pick(what: str, labels: list[str], setting: str, default: int | None = None) -> int:
+    """Return the index of the chosen label. Ask on a terminal, otherwise stop.
+
+    An empty answer takes `default` when one is given.
+    """
+    if len(labels) == 1:
+        return 0
+    listing = "\n".join(f"    {i}. {label}" for i, label in enumerate(labels, 1))
+    if not sys.stdin.isatty():
+        raise SystemExit(
+            f"error: {what} is not set. Set {setting} in .env. Options:\n{listing}"
+        )
+    print(f"\n  Choose {what}:\n{listing}")
+    hint = f" [{default + 1}]" if default is not None else ""
+    while True:
+        try:
+            answer = input(f"  Enter a number{hint}: ").strip()
+        except EOFError:
+            raise SystemExit(f"error: no answer for {what}. Set {setting} in .env.") from None
+        if not answer and default is not None:
+            return default
+        if answer.isdigit() and 1 <= int(answer) <= len(labels):
+            return int(answer) - 1
+
+
+def instance_id_from_uri(uri: str | None) -> str | None:
+    """abcd1234 from neo4j+s://abcd1234.databases.neo4j.io, else None."""
+    host = urlparse(uri).hostname if uri else None
+    if host and host.endswith(f".{ZONE}"):
+        return host.removesuffix(f".{ZONE}")
+    return None
+
+
+def parse_vnet_id(resource_id: str) -> tuple[str, str]:
+    """Return (resource group, name) from a VNet resource ID."""
+    parts = resource_id.strip("/").split("/")
+    group = parts[[p.lower() for p in parts].index("resourcegroups") + 1]
+    return group, parts[-1]
+
+
+def list_workspaces() -> list[Workspace]:
+    """Databricks workspaces in the subscription, with the VNet each one injects into."""
+    found = []
+    for item in az_json("resource", "list", "--resource-type", WORKSPACE_TYPE,
+                        "--query", "[].{id:id, name:name, rg:resourceGroup}"):  # fmt: skip
+        vnet_id = az_tsv("resource", "show", "--ids", item["id"], "--query",
+                         "properties.parameters.customVirtualNetworkId.value")  # fmt: skip
+        found.append(Workspace(item["name"], item["rg"], vnet_id or None))
+    return found
+
+
+def choose_workspace(s: Settings) -> Workspace:
+    workspaces = list_workspaces()
+    if s.workspace:
+        matches = [w for w in workspaces if w.name == s.workspace]
+        if not matches:
+            raise SystemExit(
+                f"error: no Databricks workspace named {s.workspace} in this subscription"
+            )
+    else:
+        matches = [w for w in workspaces if w.vnet_id]
+        if not matches:
+            raise SystemExit(
+                f"error: {len(workspaces)} Databricks workspace(s) found and none is "
+                "VNet-injected. A workspace in a Databricks-managed VNet cannot take a "
+                "private endpoint, so use docs/setup-ncc-manual.md. For a VNet that is "
+                "not a workspace VNet, set VNET and VNET_RG in .env."
+            )
+    labels = [f"{w.name}  ({w.resource_group})" for w in matches]
+    chosen = matches[pick("a Databricks workspace", labels, "WORKSPACE_NAME or VNET")]
+    if not chosen.vnet_id:
+        raise SystemExit(
+            f"error: workspace {chosen.name} is not VNet-injected. It uses a "
+            "Databricks-managed VNet, so use docs/setup-ncc-manual.md."
+        )
+    return chosen
+
+
+def discover_network(s: Settings) -> None:
+    """Fill vnet, vnet_resource_group, and resource_group from a workspace."""
+    if s.vnet:
+        if not s.resource_group and s.vnet_resource_group:
+            s.resource_group = s.vnet_resource_group
+            s.found("RG", s.resource_group, "same as VNET_RG")
+        return
+    workspace = choose_workspace(s)
+    group, name = parse_vnet_id(workspace.vnet_id)
+    source = f"workspace {workspace.name}"
+    s.vnet, s.vnet_resource_group = name, group
+    s.found("VNET", name, source)
+    s.found("VNET_RG", group, source)
+    if not s.resource_group:
+        s.resource_group = group
+        s.found("RG", group, "same as VNET_RG")
+    if not s.workspace:
+        s.found("WORKSPACE_NAME", workspace.name, "chosen")
+
+
+AZURE_RESERVED_IPS = 5  # Azure holds back 5 addresses in every subnet
+
+
+def subnet_prefixes(subnet: dict) -> list[str]:
+    return subnet.get("addressPrefixes") or [subnet["addressPrefix"]]
+
+
+def subnet_nics(subnet: dict) -> int:
+    """NICs in the subnet that are not private endpoints, such as VM NICs."""
+    return len(subnet.get("ipConfigurations") or []) - len(subnet.get("privateEndpoints") or [])
+
+
+def subnet_label(subnet: dict, suggested: bool) -> str:
+    """One line that tells subnets apart: CIDR, what lives in it, and free IPs."""
+    prefixes = subnet_prefixes(subnet)
+    endpoints = len(subnet.get("privateEndpoints") or [])
+    nics = subnet_nics(subnet)
+    used = len(subnet.get("ipConfigurations") or [])
+    size = sum(ipaddress.ip_network(p).num_addresses for p in prefixes)
+    facts = [
+        f"{endpoints} private endpoint{'' if endpoints == 1 else 's'}",
+        f"{nics} other NIC{'' if nics == 1 else 's'}",
+        f"{size - AZURE_RESERVED_IPS - used} IPs free",
+    ]
+    for key, name in (("networkSecurityGroup", "NSG"), ("routeTable", "route table")):
+        if subnet.get(key):
+            facts.append(f"{name} {subnet[key]['id'].rsplit('/', 1)[-1]}")
+    marker = "  <- suggested" if suggested else ""
+    return f"{subnet['name']}  {', '.join(prefixes)}  ({', '.join(facts)}){marker}"
+
+
+def suggest_subnet(subnets: list[dict]) -> int | None:
+    """Index of the subnet most likely meant for the endpoint, or None.
+
+    The one that already holds private endpoints wins. Failing that, the only
+    subnet with no other NICs in it, since a subnet with VMs is a workload subnet.
+    """
+    endpoints = [len(x.get("privateEndpoints") or []) for x in subnets]
+    if max(endpoints) > 0:
+        return endpoints.index(max(endpoints))
+    empty = [i for i, x in enumerate(subnets) if not x.get("ipConfigurations")]
+    return empty[0] if len(empty) == 1 else None
+
+
+def discover_subnet(s: Settings) -> None:
+    """Pick a subnet that can hold the endpoint NIC."""
+    if s.subnet or not (s.vnet and s.vnet_rg):
+        return
+    subnets = az_json("network", "vnet", "subnet", "list",
+                      "--resource-group", s.vnet_rg, "--vnet-name", s.vnet)  # fmt: skip
+    usable = [
+        x for x in subnets
+        if not x.get("delegations") and x["name"] not in RESERVED_SUBNETS
+    ]  # fmt: skip
+    if not usable:
+        raise SystemExit(
+            f"error: every subnet in {s.vnet} is delegated or reserved, so none can hold "
+            "a private endpoint. Create a subnet, then set PE_SUBNET in .env."
+        )
+    suggested = suggest_subnet(usable)
+    labels = [subnet_label(x, i == suggested) for i, x in enumerate(usable)]
+    s.subnet = usable[pick("a subnet for the endpoint", labels, "PE_SUBNET", suggested)]["name"]
+    s.found("PE_SUBNET", s.subnet, "not delegated")
+
+
+def discover_endpoint(s: Settings) -> None:
+    """Reuse an existing pe-<instance-id>-* endpoint, else derive a name from the VNet region."""
+    if s.name and s.resource_group:
+        return
+    if not s.instance_id:
+        return
+    prefix = f"pe-{s.instance_id}-"
+    scope = ["--resource-group", s.resource_group] if s.resource_group else []
+    proc = az("network", "private-endpoint", "list", *scope, "--query",
+              f"[?starts_with(name, '{prefix}')].{{name:name, rg:resourceGroup}}",
+              "-o", "json", check=False)  # fmt: skip
+    matches = json.loads(proc.stdout) if proc.returncode == 0 else []
+    if s.name:
+        matches = [m for m in matches if m["name"] == s.name]
+    if matches:
+        labels = [f"{m['name']}  ({m['rg']})" for m in matches]
+        chosen = matches[pick("a private endpoint", labels, "PE_NAME and RG")]
+        if not s.name:
+            s.name = chosen["name"]
+            s.found("PE_NAME", s.name, "existing endpoint")
+        if not s.resource_group:
+            s.resource_group = chosen["rg"]
+            s.found("RG", s.resource_group, "existing endpoint")
+    elif not s.name and s.vnet and s.vnet_rg:
+        region = az_tsv("network", "vnet", "show", "--resource-group", s.vnet_rg,
+                        "--name", s.vnet, "--query", "location")  # fmt: skip
+        s.name = prefix + region
+        s.found("PE_NAME", s.name, "instance id and VNet region")
+
+
+def discover(s: Settings, command: str) -> None:
+    """Fill every unset setting that Azure can answer, then print what it found."""
+    if command in {"create", "dns", "add-routing-host", "run"}:
+        discover_network(s)
+    if command in {"create", "run"}:
+        discover_subnet(s)
+    discover_endpoint(s)
+    if s.notes:
+        banner("Discovered settings")
+        for line in s.notes:
+            info(line)
+        info("Put these in .env to skip the lookup.")
 
 
 # ---------------------------------------------------------------------------
@@ -743,24 +996,12 @@ def cmd_destroy(args: argparse.Namespace, s: Settings) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    env = os.environ.get
     parser = argparse.ArgumentParser(
-        description="Azure Private Link to Neo4j Aura via the Azure CLI.",
+        description="Azure Private Link to Neo4j Aura via the Azure CLI. "
+        "Settings come from the repo-root .env file.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument("--resource-group", default=env("RG"))
-    common.add_argument("--vnet", default=env("VNET"))
-    common.add_argument("--vnet-resource-group", default=env("VNET_RG"))
-    common.add_argument("--subnet", default=env("PE_SUBNET"))
-    common.add_argument("--name", default=env("PE_NAME"), help="private endpoint name")
-    common.add_argument("--pls-alias", default=env("AURA_PLS_ALIAS"))
-    common.add_argument("--instance-id", default=env("AURA_INSTANCE_ID"))
-    common.add_argument(
-        "--request-message",
-        default=env("REQUEST_MESSAGE", "Neo4j Aura Private Link"),
-        help="shown on the Aura approval screen",
-    )
 
     dry = argparse.ArgumentParser(add_help=False)
     dry.add_argument(
@@ -784,7 +1025,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_add_routing_host)
     p = sub.add_parser("verify", parents=[common])
     p.add_argument("--vm", help="resolve each host from this VM via run-command")
-    p.add_argument("--vm-resource-group", help="defaults to --resource-group")
+    p.add_argument("--vm-resource-group", help="defaults to RG")
     p.add_argument("--bolt", action="store_true", help="run a connectivity test with neo4j-cli")
     p.add_argument("--bolt-uri", help="default: neo4j+s://<instance-id>.databases.neo4j.io")
     p.add_argument("--bolt-credential", help="neo4j-cli stored credential name")
@@ -797,19 +1038,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     global DRY_RUN
+    config = dotenv_values(REPO_ROOT / ".env").get
     args = build_parser().parse_args()
     DRY_RUN = getattr(args, "dry_run", False)
     settings = Settings(
-        resource_group=args.resource_group,
-        vnet=args.vnet,
-        vnet_resource_group=args.vnet_resource_group,
-        subnet=args.subnet,
-        name=args.name,
-        pls_alias=args.pls_alias,
-        instance_id=args.instance_id,
-        request_message=args.request_message,
+        resource_group=config("RG"),
+        vnet=config("VNET"),
+        vnet_resource_group=config("VNET_RG"),
+        subnet=config("PE_SUBNET"),
+        name=config("PE_NAME"),
+        pls_alias=config("AURA_PLS_ALIAS"),
+        instance_id=config("AURA_INSTANCE_ID") or instance_id_from_uri(config("NEO4J_URI")),
+        request_message=config("REQUEST_MESSAGE") or "Neo4j Aura Private Link",
+        workspace=config("WORKSPACE_NAME"),
     )
     try:
+        discover(settings, args.command)
         code = args.func(args, settings)
     except PauseNeeded as pause:
         print(f"\nPAUSED\n  {pause}")

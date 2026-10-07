@@ -108,7 +108,7 @@ az network private-dns record-set a add-record \
 
 ### Step 4: Add routing-host records when a client needs them
 
-Aura VDC returns Bolt routing addresses that look like `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io`. The notebooks in this repository map those hosts back to the instance host, so they pass without these records. A client without such a resolver reports `Cannot resolve address p-...neo4j.io:7687`, and the error names the host. Your own apps and jobs, `neo4j-cli`, and Neo4j Desktop are examples of such clients.
+Aura VDC returns Bolt routing addresses that look like `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io`. The `ncc-notebooks/` set maps those hosts back to the instance host, so it passes without these records. The `pl-notebooks/` set uses plain DNS by default, so it fails until they exist. A client without such a resolver reports `Cannot resolve address p-...neo4j.io:7687`, and the error names the host. Your own apps and jobs, `neo4j-cli`, and Neo4j Desktop are examples of such clients.
 
 Routing hosts sit under `<orch>.neo4j.io`, not under `databases.neo4j.io`, so they need their own zone in the hub. Set the host from the error message, then derive the zone and the record name from it:
 

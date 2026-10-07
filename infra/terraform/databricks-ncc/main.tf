@@ -92,7 +92,7 @@ output "next_steps" {
        Refresh the account console. It can take a few minutes.
     3. Wait 10 minutes after the attach, then restart any running serverless
        compute, such as SQL warehouses and running jobs.
-    4. Run notebooks/01_validate_connectivity.py on serverless compute
+    4. Run ncc-notebooks/01_validate_connectivity.py on serverless compute
        to validate the private path end-to-end.
        See docs/setup-ncc-terraform.md, or run scripts/automate.py.
   EOT

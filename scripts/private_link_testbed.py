@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = [
+#     "python-dotenv>=1.0",
+# ]
 # ///
 """
 private_link_testbed.py - build a throwaway Azure stand-in for Aura, to test private_link.py.
@@ -22,12 +24,12 @@ Commands:
               --vm adds a small Ubuntu VM in the consumer VNet to resolve DNS from.
   approve     Approve every pending connection on the PLS. This stands in for the
               Aura console step.
-  env         Print the exports that private_link.py reads.
+  env         Print the .env lines that private_link.py reads.
   down        Delete the resource group and everything in it.
 
 Usage:
   uv run scripts/private_link_testbed.py up --vm
-  eval "$(uv run scripts/private_link_testbed.py env)"
+  uv run scripts/private_link_testbed.py env >> .env
   uv run scripts/private_link.py create
   uv run scripts/private_link_testbed.py approve
   uv run scripts/private_link.py dns
@@ -152,7 +154,7 @@ def cmd_env(args: argparse.Namespace) -> int:
         "AURA_INSTANCE_ID": INSTANCE_ID,
     }
     for key, value in exports.items():
-        print(f'export {key}="{value}"')
+        print(f'{key}="{value}"')
     return 0
 
 

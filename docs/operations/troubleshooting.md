@@ -37,7 +37,7 @@ for host in [
     print(host, ip, ipaddress.ip_address(ip).is_private)
 ```
 
-The alternative is to give your app the same resolver the notebooks use. It keeps the `neo4j+s://` URI and maps any host that matches `^p-<aura-instance-id>-.*\.neo4j\.io$` back to the instance host. This version follows [notebooks/01_validate_connectivity.py](../../notebooks/01_validate_connectivity.py):
+The alternative is to give your app the same resolver the notebooks use. It keeps the `neo4j+s://` URI and maps any host that matches `^p-<aura-instance-id>-.*\.neo4j\.io$` back to the instance host. This version follows [ncc-notebooks/01_validate_connectivity.py](../../ncc-notebooks/01_validate_connectivity.py). The Private Link notebook [pl-notebooks/01_validate_connectivity.py](../../pl-notebooks/01_validate_connectivity.py) has the same function behind a `use_resolver` widget that is off by default:
 
 ```python
 import re

@@ -104,11 +104,16 @@ The Aura console has no API, so its steps are manual in every path. They are col
 │   │   ├── security-review.md                      # Security review findings
 │   │   └── suggest-improvements.md                 # Suggested improvements
 │   └── images/                                     # SVG diagrams and screenshots used in the docs
-├── notebooks/
+├── ncc-notebooks/                                  # Notebooks for the NCC path (serverless compute)
 │   ├── 01_validate_connectivity.py                 # Generic DNS + Bolt sanity check
 │   ├── 02_delta_to_neo4j.py                        # Round-trip: Delta -> Neo4j -> Delta
 │   ├── 03_serverless_push_pull_demo.py             # Small push/pull demo over PrivateLink (synthetic customers)
 │   └── 04_smoke_test.py                            # End-to-end PrivateLink smoke test with write and read-back
+├── pl-notebooks/                                   # Notebooks for the Private Link path (classic clusters)
+│   ├── 01_validate_connectivity.py                 # DNS, routing-host, and Bolt checks, no resolver by default
+│   ├── 02_delta_to_neo4j.py                        # Round-trip: Delta -> Neo4j -> Delta
+│   ├── 03_push_pull_demo.py                        # Small push/pull demo over Private Link (synthetic customers)
+│   └── 04_smoke_test.py                            # End-to-end smoke test with routing-host check, write, and read-back
 ├── infra/
 │   └── terraform/
 │       ├── README.md                               # Index: which stack to pick

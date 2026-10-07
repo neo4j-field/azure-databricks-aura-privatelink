@@ -34,7 +34,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ## Scope and method
 
-- **Reviewed:** The review covered all Terraform in `infra/terraform/`, everything in `scripts/` and `notebooks/`, all docs, `.gitignore`, and the full git history.
+- **Reviewed:** The review covered all Terraform in `infra/terraform/`, everything in `scripts/` and `ncc-notebooks/`, all docs, `.gitignore`, and the full git history.
 - **Method:** The review was manual. No scanner such as tfsec, checkov, or trivy is installed, so none ran.
 - **Secrets handling:** The review read only the key names and file permissions of `.env`, `terraform.tfvars`, and the state files. It never read their values.
 - **Live systems:** The review did not inspect live Azure, Databricks, or Aura settings. Any finding about a live setting says so.
@@ -102,7 +102,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ### H3. One shared admin database account serves every notebook
 
-- **Where:** `notebooks/01_validate_connectivity.py` line 25, and the same pattern in notebooks 02, 03, and 04. The `.env` template defaults the user to `neo4j`.
+- **Where:** `ncc-notebooks/01_validate_connectivity.py` line 25, and the same pattern in notebooks 02, 03, and 04. The `.env` template defaults the user to `neo4j`.
 - **Risk:** Validation, ETL, and demo code all use the same admin login. Any code that runs with read access to the `neo4j` scope gets full control of the database. That includes `DETACH DELETE`.
 - **Risk:** `scripts/automate.py` line 375 creates the scope with default permissions. The creator holds MANAGE, and the scope name is readable by every workspace user.
 - **Fix:** Create separate Aura users and roles. Use a read-only role for validation and a narrow write role for ETL.
@@ -125,7 +125,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ### M2. The public repo carries real identifiers and has no secret scanning
 
-- **Where:** The GitHub repo `neo4j-field/azure-databricks-aura-privatelink` is public. `docs/automate-tf-ncc-setup.md` line 49 holds the Databricks account ID and workspace host. `README.md` now holds only placeholders. `notebooks/04_smoke_test.py` hardcodes an Aura hostname and a workspace name.
+- **Where:** The GitHub repo `neo4j-field/azure-databricks-aura-privatelink` is public. `docs/automate-tf-ncc-setup.md` line 49 holds the Databricks account ID and workspace host. `README.md` now holds only placeholders. `ncc-notebooks/04_smoke_test.py` hardcodes an Aura hostname and a workspace name.
 - **Risk:** These values are identifiers, not credentials. They still map your environment for phishing and targeted attacks.
 - **Risk:** The repo has no CI, no secret scanning, and no pre-commit checks. A future mistake would ship a real secret to a public repo.
 - **Fix:** Replace real values in tracked files with placeholders. Read them from environment variables or tfvars.
@@ -229,12 +229,12 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 
 ### L3. Notebooks live in `/Shared` and the delete demos have no guard
 
-- **Where:** `scripts/automate.py` line 72 sets the import folder to `/Shared/aura-privatelink`. `notebooks/04_smoke_test.py` line 240 and `notebooks/03_serverless_push_pull_demo.py` line 109 build `DETACH DELETE` queries from f-string labels.
+- **Where:** `scripts/automate.py` line 72 sets the import folder to `/Shared/aura-privatelink`. `ncc-notebooks/04_smoke_test.py` line 240 and `ncc-notebooks/03_serverless_push_pull_demo.py` line 109 build `DETACH DELETE` queries from f-string labels.
 - **Risk:** `/Shared` is usually open to all workspace users. Confirm this in your workspace. Another user could edit a notebook that then runs with the operator's secret access.
 - **Risk:** The label constants are safe today. With the admin account, a wrong label deletes real data.
 - **Fix:** Import notebooks to `/Workspace/Users/<operator>/aura-privatelink` and set folder permissions. Alternatively, run from a Git folder pinned to a commit.
 - **Fix:** Check that each label starts with a test prefix before any delete. Run the demos against a separate database.
-- **Fix:** Remove the dead code on line 27 of `notebooks/01_validate_connectivity.py`. The `if False else "neo4j"` expression ignores the `database` secret.
+- **Fix:** Remove the dead code on line 27 of `ncc-notebooks/01_validate_connectivity.py`. The `if False else "neo4j"` expression ignores the `database` secret.
 
 ### L4. DNS validation can pass for the wrong address
 
@@ -279,7 +279,7 @@ No Critical findings exist. The review found 3 High, 10 Medium, and 7 Low findin
 - **Secret variables:** Secret inputs are marked `sensitive` and default to null.
 - **Git hygiene:** `.gitignore` covers `.env*`, `*.tfvars`, `*.tfstate*`, and key files. The full history holds none of them.
 - **Secret handling in code:** Notebooks read credentials from `dbutils.secrets`. `scripts/automate.py` writes secrets through the SDK, not a shell command.
-- **Guard rails:** `notebooks/04_smoke_test.py` asserts the host before it runs, and the shell scripts use `set -euo pipefail`.
+- **Guard rails:** `ncc-notebooks/04_smoke_test.py` asserts the host before it runs, and the shell scripts use `set -euo pipefail`.
 
 ## Doc changes already applied
 
@@ -316,7 +316,7 @@ These findings fit neither group above.
 - **H1:** Add a "definition of done" step to `scripts/automate.py` that prints the manual action to disable public access.
 - **H3:** Create least-privilege Aura users. Use one secret scope per purpose, with ACLs.
 - **M1:** Run `chmod 600` on `.env`, the tfvars file, and every state file.
-- **M2:** Replace the hardcoded Aura hostname and workspace name in `notebooks/04_smoke_test.py`. Turn on secret scanning and add pre-commit and CI checks.
+- **M2:** Replace the hardcoded Aura hostname and workspace name in `ncc-notebooks/04_smoke_test.py`. Turn on secret scanning and add pre-commit and CI checks.
 - **M3:** Plan before apply, remove the default `--workspace-profile`, and confirm before `delete_scope`.
 - **M4:** Pipe secret values on standard input in `scripts/create-secret-scope.sh`. Replace the raw bearer token in `scripts/create-private-endpoint-rule.sh`. The curl examples in the REST alternative of `docs/setup-ncc-manual.md` Step 3 use the same header pattern. They stay unchanged.
 - **L3:** Import notebooks to a per-user folder and guard the `DETACH DELETE` demos.
@@ -457,7 +457,7 @@ Apply T1 to T11 one phase at a time. After each phase, prove that the private pa
   - [ ] Document the rollback, which rebinds the workspace to the default policy.
 - **Validation:**
   - The validation notebook passes, including its `%pip install`.
-  - `notebooks/04_smoke_test.py` passes its write and read-back.
+  - `ncc-notebooks/04_smoke_test.py` passes its write and read-back.
   - A serverless notebook request to a host outside the list, such as `https://example.com`, fails.
   - Denied requests appear in the outbound network system table. Confirm the table name in your workspace.
 

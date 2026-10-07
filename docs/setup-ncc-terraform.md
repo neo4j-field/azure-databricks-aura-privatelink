@@ -167,7 +167,7 @@ After `ESTABLISHED`, the same invocation continues:
 
 - **Warehouses.** Running SQL warehouses are stopped and started so they pick up NCC-managed DNS. With none running, this step does nothing. Pass `--skip-warehouse-restart` to leave active SQL sessions untouched on re-runs.
 - **Secrets.** If the `neo4j` scope is missing, or lacks any of `uri`, `username`, `password`, and `database`, the orchestrator creates the scope and sets all four keys from the `NEO4J_*` values in `.env`. If all four keys exist, it skips the write. It uses the workspace SDK client and the `--workspace-profile` auth that client already holds, so no bearer token is minted and no helper subprocess runs. `scripts/create-secret-scope.sh` remains for CLI-only environments.
-- **Validation notebook.** The orchestrator imports `notebooks/01_validate_connectivity.py` to `/Shared/aura-privatelink/01_validate_connectivity` in the workspace, overwriting any earlier copy. It submits that notebook as a one-time serverless run. The run ID prints before the wait, so you can find the run in the Jobs UI. The default wait is 30 minutes. If the run does not finish in time, the tool pauses and exits `2`. Check the run in the Jobs UI, then re-run.
+- **Validation notebook.** The orchestrator imports `ncc-notebooks/01_validate_connectivity.py` to `/Shared/aura-privatelink/01_validate_connectivity` in the workspace, overwriting any earlier copy. It submits that notebook as a one-time serverless run. The run ID prints before the wait, so you can find the run in the Jobs UI. The default wait is 30 minutes. If the run does not finish in time, the tool pauses and exits `2`. Check the run in the Jobs UI, then re-run.
 
 On success the tool prints `SUCCESS` and exits `0`.
 
@@ -186,7 +186,7 @@ The allow-list pause can repeat once per GUID, because Databricks can retry from
 | `--account-profile` | Required | CLI profile for `accounts.azuredatabricks.net`. Every run polls the rule, including `--no-apply`. |
 | `--workspace-profile` | `WORKSPACE_PROFILE` from `.env` | CLI profile for the target workspace. The run errors if neither the flag nor `WORKSPACE_PROFILE` is set. |
 | `--no-apply` | off | Skip `terraform apply`. Read `terraform output -json` only. |
-| `--notebook PATH` | `notebooks/01_validate_connectivity.py` | Validation notebook to run. |
+| `--notebook PATH` | `ncc-notebooks/01_validate_connectivity.py` | Validation notebook to run. |
 | `--poll-timeout N` | `600` | Seconds to wait for `ESTABLISHED`. |
 | `--poll-interval N` | `15` | Seconds between rule status polls. |
 | `--run-timeout N` | `30` | Minutes to wait for the validation run. |
@@ -223,9 +223,9 @@ The stack attaches the NCC with `databricks_mws_ncc_binding` instead of `databri
 
 ## Validate connectivity
 
-On success the orchestrator has already created the `neo4j` secret scope. It has also run [notebooks/01_validate_connectivity.py](../notebooks/01_validate_connectivity.py) on serverless compute from `/Shared/aura-privatelink/01_validate_connectivity`. It imports only that one notebook.
+On success the orchestrator has already created the `neo4j` secret scope. It has also run [ncc-notebooks/01_validate_connectivity.py](../ncc-notebooks/01_validate_connectivity.py) on serverless compute from `/Shared/aura-privatelink/01_validate_connectivity`. It imports only that one notebook.
 
-To run all four notebooks yourself, including the smoke test in [notebooks/04_smoke_test.py](../notebooks/04_smoke_test.py), follow [Validate connectivity](setup-ncc-manual.md#validate-connectivity) in the NCC manual guide. Skip its secret scope step. Its upload snippet reads the `WORKSPACE_PROFILE` you exported in [Prerequisites](#prerequisites). It copies the notebooks to `/Users/<your-user-name>/neo4j-privatelink`, which is a different folder from the orchestrator's `/Shared/aura-privatelink/`.
+To run all four notebooks yourself, including the smoke test in [ncc-notebooks/04_smoke_test.py](../ncc-notebooks/04_smoke_test.py), follow [Validate connectivity](setup-ncc-manual.md#validate-connectivity) in the NCC manual guide. Skip its secret scope step. Its upload snippet reads the `WORKSPACE_PROFILE` you exported in [Prerequisites](#prerequisites). It copies the notebooks to `/Users/<your-user-name>/neo4j-privatelink`, which is a different folder from the orchestrator's `/Shared/aura-privatelink/`.
 
 ## Close the public endpoint
 

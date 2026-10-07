@@ -46,21 +46,27 @@ az login --tenant "<tenant-id>"
 az account set --subscription "<subscription-id>"
 ```
 
-Set the values both options reuse. The script reads these same variables:
+Both options use the same values. The script reads them only from the repo-root `.env` file. It has no flags for them and ignores exported shell variables. Copy `env.sample` to `.env` if you have not yet, and add:
 
 ```bash
-export RG="<resource-group>"                     # holds the endpoint and the DNS zone
-export VNET="<vnet-name>"
-export VNET_RG="<vnet-resource-group>"           # use the same value as RG if they match
-export PE_SUBNET="<subnet-name>"
-export PE_NAME="pe-<aura-instance-id>-<region>"
-export AURA_PLS_ALIAS="production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice"
-export AURA_INSTANCE_ID="<aura-instance-id>"     # the label only, for example abcd1234
-export REQUEST_MESSAGE="Neo4j Aura Private Link from <team> / <subscription nickname>"  # read by the script
+RG="<resource-group>"                     # holds the endpoint and the DNS zone
+VNET="<vnet-name>"
+VNET_RG="<vnet-resource-group>"           # use the same value as RG if they match
+PE_SUBNET="<subnet-name>"
+PE_NAME="pe-<aura-instance-id>-<region>"
+AURA_PLS_ALIAS="production-orch-<id>-service.<guid>.<region>.azure.privatelinkservice"
+AURA_INSTANCE_ID="<aura-instance-id>"     # the label only, for example abcd1234
+REQUEST_MESSAGE="Neo4j Aura Private Link from <team> / <subscription nickname>"
+```
+
+For Option B, load the same file into your shell and set the zone name, which the script keeps as a constant:
+
+```bash
+set -a; source .env; set +a
 export ZONE="databases.neo4j.io"
 ```
 
-`AURA_PLS_ALIAS` is the Private Link service name from the Aura console. `AURA_INSTANCE_ID` is the first label of the Aura hostname, so `abcd1234` for `abcd1234.databases.neo4j.io`. `REQUEST_MESSAGE` appears on the Aura approval screen. Make it identify your team so the Aura admin can match the request. The script falls back to a generic message when you leave it unset.
+`AURA_PLS_ALIAS` is the Private Link service name from the Aura console. `AURA_INSTANCE_ID` is the first label of the Aura hostname, so `abcd1234` for `abcd1234.databases.neo4j.io`. `REQUEST_MESSAGE` appears on the Aura approval screen. Make it identify your team so the Aura admin can match the request. The script falls back to a generic message when you leave it unset, and Option B reads it from the `.env` you loaded.
 
 **Where to find the network values.** These four describe your existing Azure network, so look them up rather than invent them:
 
@@ -71,7 +77,19 @@ export ZONE="databases.neo4j.io"
 | `RG` | Resource group that will hold the private endpoint and the private DNS zone | Your choice. Use `VNET_RG` unless your team keeps networking resources elsewhere. |
 | `PE_SUBNET` | Name of a subnet in `VNET` for the private endpoint | Azure portal, the VNet, **Subnets**. Pick a subnet that is not delegated, or create a new one. |
 
-To list them from the CLI:
+**What the script fills in for you.** With Option A you only have to set `AURA_PLS_ALIAS` in `.env`. The script discovers the rest when a value is missing, and prints what it found so you can copy it into `.env`. Option B has no discovery, so set every value yourself:
+
+| Variable | How the script finds it |
+|----------|-------------------------|
+| `AURA_INSTANCE_ID` | The first label of `NEO4J_URI` |
+| `VNET`, `VNET_RG` | The custom VNet of a VNet-injected Databricks workspace. Set `WORKSPACE_NAME` in `.env` to pick the workspace. If you leave it unset, the script lists the VNet-injected workspaces in the subscription and asks which one. |
+| `RG` | The same value as `VNET_RG` |
+| `PE_SUBNET` | The subnets in `VNET` that are not delegated. It asks when more than one qualifies. |
+| `PE_NAME` | An existing `pe-<aura-instance-id>-*` endpoint, otherwise `pe-<aura-instance-id>-<VNet region>` |
+
+A workspace is VNet-injected only if you chose your own VNet when you created it. Otherwise Databricks creates a locked VNet in a managed resource group, which cannot hold a private endpoint, and the script skips that workspace. Use the [NCC manual setup](setup-ncc-manual.md) for it. If a VNet is not a workspace VNet, set `VNET` and `VNET_RG` yourself. Without a terminal to ask on, the script stops and lists the options instead.
+
+To list the same values from the CLI:
 
 ```bash
 az network vnet list --query "[].{vnet:name, resourceGroup:resourceGroup}" -o table
@@ -326,7 +344,7 @@ Repeat both commands for each routing-host record. Use `--zone-name "$ORCH_ZONE"
 Both options leave you with a private endpoint, an approved connection, and an instance A record. Work through these in order:
 
 1. [Validate connectivity](#validate-connectivity). Confirm the hostname resolves to the endpoint IP and a Bolt query succeeds.
-2. [Add routing-host records](#add-routing-host-records). Do this when a client reports `Cannot resolve address p-...neo4j.io:7687`. The notebooks pass without these records.
+2. [Add routing-host records](#add-routing-host-records). Do this when a client reports `Cannot resolve address p-...neo4j.io:7687`. The `pl-notebooks/` check fails until they exist.
 3. [Close the public endpoint](#close-the-public-endpoint). Do this only after validation succeeds.
 4. [Teardown](#teardown) when you no longer need the setup.
 
@@ -345,7 +363,7 @@ The `nslookup` answer must be the endpoint private IP. A public address means th
 
 #### Run a Bolt query
 
-**Script.** [`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from the variables in [Before you start](#before-you-start):
+**Script.** [`scripts/private_link.py`](../scripts/private_link.py) runs the checks for you. It reads `RG`, `PE_NAME`, and `AURA_INSTANCE_ID` from `.env`, as set in [Before you start](#before-you-start):
 
 ```bash
 uv run scripts/private_link.py verify --bolt
@@ -361,7 +379,7 @@ Add `--vm <name>` to resolve each host from a VM in the VNet. `--bolt` runs `RET
 
 #### Classic Databricks clusters
 
-The notebooks also run on classic clusters in a VNet-injected workspace, as long as the workspace VNet is linked to the private DNS zone.
+The notebooks in `pl-notebooks/` run on classic clusters in a VNet-injected workspace, as long as the workspace VNet is linked to the private DNS zone.
 
 **Create the secret scope.** The notebooks read Neo4j credentials from a secret scope named `neo4j` in the workspace. Copy the sample file and fill it in. The URI host is your Aura Private URI host:
 
@@ -381,7 +399,7 @@ cp env.sample .env
 : "${WORKSPACE_PROFILE:?WORKSPACE_PROFILE is not set}"
 export NOTEBOOK_DIR="/Users/$(databricks --profile "$WORKSPACE_PROFILE" current-user me -o json | jq -r .userName)/neo4j-privatelink"
 databricks --profile "$WORKSPACE_PROFILE" workspace mkdirs "$NOTEBOOK_DIR"
-for f in notebooks/0*.py; do
+for f in pl-notebooks/0*.py; do
   databricks --profile "$WORKSPACE_PROFILE" workspace import "$NOTEBOOK_DIR/$(basename "$f" .py)" \
     --file "$f" --format SOURCE --language PYTHON --overwrite
 done
@@ -391,13 +409,20 @@ Open the `neo4j-privatelink` folder in the workspace and attach each notebook to
 
 **Restart running clusters after DNS changes.** A cluster that resolved the host before the record existed can keep the public answer cached. Restart it after you create or change any A record or zone link.
 
-Run [notebooks/01_validate_connectivity.py](../notebooks/01_validate_connectivity.py). It asserts that the Aura host resolves to a private address. On this path a public answer points to the zone link or the A record, not to an NCC rule. The notebooks map routing hosts back to the instance host, so they pass without routing-host records.
+Run [pl-notebooks/01_validate_connectivity.py](../pl-notebooks/01_validate_connectivity.py). It checks four things in order:
+
+1. The Aura host resolves to a private address. Set the `expected_pe_ip` widget to the endpoint IP to pin the exact address. A public answer points to the zone link or the A record, not to an NCC rule.
+2. TCP reaches the Bolt port.
+3. Every routing host that Aura advertises resolves to the endpoint. A host without a record fails, and the notebook prints the `add-routing-host` command for it.
+4. A Bolt query succeeds with plain DNS.
+
+The notebook maps routing hosts back to the instance host only when you set the `use_resolver` widget to `true`. That workaround hides missing records, so use it only to compare. [pl-notebooks/04_smoke_test.py](../pl-notebooks/04_smoke_test.py) repeats the DNS and routing-host checks and adds a 100-row write and read-back.
 
 ### Add routing-host records
 
 Aura VDC returns Bolt routing addresses after the first connection. They look like `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io`. These hosts sit under `<orch>.neo4j.io`, not under `databases.neo4j.io`. A record in the `databases.neo4j.io` zone never matches them, so each one needs its own record in a separate zone.
 
-The notebooks in this repository map routing hosts back to the instance host, so they never need these records. Clients without such a resolver do need them. Examples are your own apps and jobs, `neo4j-cli`, Neo4j Desktop, and drivers elsewhere. Such a client reports `Cannot resolve address p-...neo4j.io:7687`, and the error names the host. `private_link.py verify --bolt` runs `neo4j-cli`, so it surfaces missing hosts too. You learn the host names from that error, so neither option can create these records during setup.
+The `ncc-notebooks/` set maps routing hosts back to the instance host, so it never needs these records. The `pl-notebooks/` set does not, unless you turn on its `use_resolver` widget. Clients without such a resolver do need them. Examples are your own apps and jobs, `neo4j-cli`, Neo4j Desktop, and drivers elsewhere. Such a client reports `Cannot resolve address p-...neo4j.io:7687`, and the error names the host. `private_link.py verify --bolt` runs `neo4j-cli`, so it surfaces missing hosts too. `pl-notebooks/01_validate_connectivity.py` lists every advertised routing host and prints the command for each one that lacks a record. You learn the host names only after setup, from that error or from the notebook, so neither option can create these records during setup.
 
 With central hub DNS, add these records in the hub as in [Add routing-host records when a client needs them](shared/private-dns-central.md#step-4-add-routing-host-records-when-a-client-needs-them).
 

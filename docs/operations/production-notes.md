@@ -25,7 +25,7 @@ Notes are grouped by path. **NCC** covers Databricks Serverless. **Private Link*
 
 - **Idempotent writes:** Use Cypher `MERGE` instead of `CREATE` on `:Label {id: $id}` keys.
 - **Batch writes:** Use `UNWIND` with batch sizes of 1k to 10k rows, depending on payload.
-- **Retry transient failures:** The `neo4j` driver raises `TransientError`. Wrap writes with bounded retries, as in [notebooks/02_delta_to_neo4j.py](../../notebooks/02_delta_to_neo4j.py).
+- **Retry transient failures:** The `neo4j` driver raises `TransientError`. Wrap writes with bounded retries, as in [ncc-notebooks/02_delta_to_neo4j.py](../../ncc-notebooks/02_delta_to_neo4j.py).
 
 ## Limitations and gotchas
 

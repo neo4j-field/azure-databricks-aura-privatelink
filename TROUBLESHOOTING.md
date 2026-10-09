@@ -2,8 +2,6 @@
 
 Use this guide when `ncc-notebooks/01_validate_connectivity.py` fails and the Aura host does not resolve from Azure Databricks serverless compute. Every check here uses only the `databricks` CLI against the account console. You do not need the account console UI, curl, or Terraform.
 
-For other failures, see [docs/operations/troubleshooting.md](docs/operations/troubleshooting.md).
-
 ## What the symptom means
 
 The notebook connects to the host in the `uri` secret first. Step 2 resolves that host, and step 3 opens TCP to it on port 7687. If the host prints `UNRESOLVED`, the driver has no address to connect to, so the initial connection cannot happen. The cause is almost always in the NCC setup and not in the notebook. The checks below find it.
@@ -156,22 +154,7 @@ databricks --profile "$ACCOUNT_PROFILE" account network-connectivity \
 
 A rule can read `ESTABLISHED` and still have an empty `domain_names` list. The account console UI does not show or set this field, so only the CLI or API reveals the problem. Without the host in `domain_names`, serverless compute does not use the private DNS entry for it.
 
-If the result is `false`, set the list. The update replaces the whole list. Include the instance host and every routing host the rule already has:
-
-```bash
-export RULE_ID="$(databricks --profile "$ACCOUNT_PROFILE" account network-connectivity \
-  list-private-endpoint-rules "$NCC_ID" -o json | jq -r '.[0].rule_id')"
-
-databricks --profile "$ACCOUNT_PROFILE" account network-connectivity \
-  update-private-endpoint-rule "$NCC_ID" "$RULE_ID" domain_names \
-  --json "{\"domain_names\": [\"${AURA_PRIVATE_HOSTNAME}\"]}"
-```
-
-The `.[0]` selector assumes one rule in the NCC. If the list has more than one rule, pick the `rule_id` from the Step 3 output yourself.
-
-If the update is rejected, create a new rule with the full list and delete the old one. The new rule creates a new private endpoint, so approve it again in Aura. See [Add a routing hostname later](docs/setup-ncc-manual.md#add-a-routing-hostname-later).
-
-## Step 5: Wait, then restart serverless compute
+## Step 5: Restart serverless compute
 
 NCC changes take about 10 minutes to propagate. Sessions that started earlier keep the old DNS answer.
 

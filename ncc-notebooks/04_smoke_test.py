@@ -40,10 +40,27 @@ import socket
 import time
 from urllib.parse import urlparse
 
-NEO4J_URI      = dbutils.secrets.get(scope="neo4j", key="uri")
-NEO4J_USER     = dbutils.secrets.get(scope="neo4j", key="username")
-NEO4J_PASSWORD = dbutils.secrets.get(scope="neo4j", key="password")
-SECRET_KEYS    = {s.key for s in dbutils.secrets.list("neo4j")}
+SECRET_SCOPE     = "neo4j"
+REQUIRED_SECRETS = ("uri", "username", "password")
+
+try:
+    SECRET_KEYS = {s.key for s in dbutils.secrets.list(SECRET_SCOPE)}
+except Exception as exc:
+    raise RuntimeError(
+        f"ERROR: secret scope '{SECRET_SCOPE}' does not exist or is not readable. "
+        "Create it and add the keys uri, username and password (optional: database)."
+    ) from exc
+
+missing = [k for k in REQUIRED_SECRETS if k not in SECRET_KEYS]
+if missing:
+    raise RuntimeError(
+        f"ERROR: missing secret(s) in scope '{SECRET_SCOPE}': {', '.join(missing)}. "
+        "Add them with `databricks secrets put-secret`."
+    )
+
+NEO4J_URI      = dbutils.secrets.get(scope=SECRET_SCOPE, key="uri")
+NEO4J_USER     = dbutils.secrets.get(scope=SECRET_SCOPE, key="username")
+NEO4J_PASSWORD = dbutils.secrets.get(scope=SECRET_SCOPE, key="password")
 NEO4J_DATABASE = (
     dbutils.secrets.get(scope="neo4j", key="database")
     if "database" in SECRET_KEYS

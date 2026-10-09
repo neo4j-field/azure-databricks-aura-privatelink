@@ -16,7 +16,145 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install --quiet neo4j==5.* tenacity==9.*
+# MAGIC %md
+# MAGIC ## Debug DNS (optional, run first)
+# MAGIC
+# MAGIC Run this cell first when you suspect a DNS or NCC problem. It needs no other cell and
+# MAGIC no package install, and it does not affect the pass/fail result. It reads the host from
+# MAGIC the `uri` secret. To check a routing host too, set `ROUTING_HOST` in `.env` and re-run
+# MAGIC `scripts/create-secret-scope.sh`. The cell then reads it from the `routing_host` secret.
+# MAGIC See TROUBLESHOOTING.md in the repo for the Databricks CLI checks of the NCC itself.
+# MAGIC
+# MAGIC **Run it twice.** Check 3 needs `dnspython`, which the install cell below adds. The first
+# MAGIC run skips check 3. Once the install cell has finished, run this cell again to get check 3.
+# MAGIC
+# MAGIC The output starts with an environment block. Include it when you contact support.
+# MAGIC
+# MAGIC The cell runs four checks:
+# MAGIC 1. Resolve each host and print the resolver error code. `EAI_NONAME` means the resolver
+# MAGIC    answered that the name does not exist. `EAI_AGAIN` means it did not answer (timeout or blocked).
+# MAGIC 2. Resolve control hosts that should always work. If they fail too, DNS is broken or blocked
+# MAGIC    for the whole compute, not just the Aura name.
+# MAGIC 3. Query DNS directly with `dnspython` and print the nameservers, the response code and the
+# MAGIC    CNAME chain. A `privatelink` CNAME means the private DNS override applied. This check is
+# MAGIC    skipped when `dnspython` is not installed.
+# MAGIC 4. Open TCP to a public IP on 443. A failure points to the serverless egress policy, not Aura.
+
+# COMMAND ----------
+
+import ipaddress
+import os
+import socket
+import sys
+from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, version
+from urllib.parse import urlparse
+
+try:
+    import dns.exception
+    import dns.resolver
+except ImportError:
+    dns = None
+
+SECRET_SCOPE = "neo4j"
+try:
+    SECRET_KEYS = {s.key for s in dbutils.secrets.list(SECRET_SCOPE)}
+    host = urlparse(dbutils.secrets.get(scope=SECRET_SCOPE, key="uri")).hostname
+except Exception as exc:
+    raise RuntimeError(
+        f"ERROR: cannot read the 'uri' secret in scope '{SECRET_SCOPE}'. "
+        "Create the scope and keys first, as in step 1."
+    ) from exc
+
+CONTROL_HOSTS = ("example.com", "neo4j.com")
+PUBLIC_EGRESS_IP = "1.1.1.1"
+EAI_MEANING = {
+    socket.EAI_NONAME: "resolver answered: name not found",
+    socket.EAI_AGAIN: "no answer: DNS timed out or is blocked",
+}
+
+
+def package_version(name: str) -> str:
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return "not installed"
+
+
+def resolve_report(name: str) -> None:
+    try:
+        ip = socket.gethostbyname(name)
+    except socket.gaierror as err:
+        meaning = EAI_MEANING.get(err.errno, "other resolver error")
+        print(f"{name} -> UNRESOLVED (errno {err.errno}: {meaning}; {err})")
+        return
+    kind = "private" if ipaddress.ip_address(ip).is_private else "PUBLIC"
+    print(f"{name} -> {ip} ({kind})")
+
+
+def dns_query_report(name: str) -> None:
+    try:
+        resolver = dns.resolver.Resolver()
+    except dns.resolver.NoResolverConfiguration as err:
+        print(f"{name}: no resolver configuration ({err})")
+        return
+    print(f"{name}: nameservers {resolver.nameservers}")
+    try:
+        answer = resolver.resolve(name, "A", lifetime=5)
+    except dns.resolver.NXDOMAIN:
+        print(f"{name}: NXDOMAIN (the nameserver says the name does not exist)")
+    except dns.resolver.NoAnswer:
+        print(f"{name}: NOERROR but no A record")
+    except dns.resolver.NoNameservers as err:
+        print(f"{name}: every nameserver failed (SERVFAIL or refused): {err}")
+    except dns.exception.Timeout:
+        print(f"{name}: query timed out (nameserver unreachable or blocked)")
+    else:
+        for rrset in answer.response.answer:
+            print(f"{name}: {rrset.to_text()}")
+
+
+def tcp_report(address: str, port: int) -> None:
+    try:
+        with socket.create_connection((address, port), timeout=5):
+            print(f"TCP connect to {address}:{port} succeeded")
+    except OSError as err:
+        print(f"TCP connect to {address}:{port} FAILED ({err})")
+
+
+debug_hosts = [host]
+if "routing_host" in SECRET_KEYS:
+    debug_hosts.append(dbutils.secrets.get(scope="neo4j", key="routing_host"))
+
+print("--- Environment ---")
+print(f"time (UTC)      : {datetime.now(timezone.utc).isoformat(timespec='seconds')}")
+print(f"python          : {sys.version.split()[0]}")
+print(f"runtime         : {os.environ.get('DATABRICKS_RUNTIME_VERSION', 'unknown')}")
+print(f"neo4j driver    : {package_version('neo4j')}")
+print(f"dnspython       : {package_version('dnspython')}")
+print(f"target host     : {host}")
+
+print("\n--- 1. Resolve target hosts ---")
+for debug_host in debug_hosts:
+    resolve_report(debug_host)
+
+print("\n--- 2. Resolve control hosts ---")
+for control_host in CONTROL_HOSTS:
+    resolve_report(control_host)
+
+print("\n--- 3. Direct DNS query ---")
+if dns is None:
+    print("skipped: dnspython is not installed. Once the install cell below has finished, run this cell again.")
+else:
+    for query_host in (*debug_hosts, *CONTROL_HOSTS):
+        dns_query_report(query_host)
+
+print("\n--- 4. Egress to a public IP ---")
+tcp_report(PUBLIC_EGRESS_IP, 443)
+
+# COMMAND ----------
+
+# MAGIC %pip install --quiet neo4j==5.* tenacity==9.* dnspython==2.*
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -25,10 +163,27 @@
 
 # COMMAND ----------
 
-NEO4J_URI      = dbutils.secrets.get(scope="neo4j", key="uri")
-NEO4J_USER     = dbutils.secrets.get(scope="neo4j", key="username")
-NEO4J_PASSWORD = dbutils.secrets.get(scope="neo4j", key="password")
-SECRET_KEYS    = {s.key for s in dbutils.secrets.list("neo4j")}
+SECRET_SCOPE     = "neo4j"
+REQUIRED_SECRETS = ("uri", "username", "password")
+
+try:
+    SECRET_KEYS = {s.key for s in dbutils.secrets.list(SECRET_SCOPE)}
+except Exception as exc:
+    raise RuntimeError(
+        f"ERROR: secret scope '{SECRET_SCOPE}' does not exist or is not readable. "
+        "Create it and add the keys uri, username and password (optional: database)."
+    ) from exc
+
+missing = [k for k in REQUIRED_SECRETS if k not in SECRET_KEYS]
+if missing:
+    raise RuntimeError(
+        f"ERROR: missing secret(s) in scope '{SECRET_SCOPE}': {', '.join(missing)}. "
+        "Add them with `databricks secrets put-secret`."
+    )
+
+NEO4J_URI      = dbutils.secrets.get(scope=SECRET_SCOPE, key="uri")
+NEO4J_USER     = dbutils.secrets.get(scope=SECRET_SCOPE, key="username")
+NEO4J_PASSWORD = dbutils.secrets.get(scope=SECRET_SCOPE, key="password")
 NEO4J_DATABASE = (
     dbutils.secrets.get(scope="neo4j", key="database")
     if "database" in SECRET_KEYS
@@ -50,7 +205,14 @@ import socket
 from urllib.parse import urlparse
 
 host = urlparse(NEO4J_URI).hostname
-ip = socket.gethostbyname(host)
+try:
+    ip = socket.gethostbyname(host)
+except socket.gaierror as exc:
+    raise RuntimeError(
+        f"ERROR: DNS lookup failed for {host} (errno {exc.errno}: {exc}). The driver has "
+        "no address to connect to, so the NCC private path is not in use. Run the "
+        "'Debug DNS' cell at the top, then see TROUBLESHOOTING.md in the repo."
+    ) from exc
 print(f"{host} -> {ip}")
 
 assert ipaddress.ip_address(ip).is_private, (
@@ -94,8 +256,8 @@ def aura_private_resolver(address):
     # names do not resolve privately, map them to the Aura instance hostname,
     # which the NCC rule or the private DNS zone already resolves.
     mapped_host = host if ROUTING_HOST_PATTERN.match(address.host) else address.host
-    if mapped_host != address.host:
-        print(f"Resolver alias: {address.host}:{address.port} -> {mapped_host}:{address.port}")
+    note = " (aliased)" if mapped_host != address.host else ""
+    print(f"Resolver call: {address.host}:{address.port} -> {mapped_host}:{address.port}{note}")
     return [(mapped_host, address.port)]
 
 driver = GraphDatabase.driver(
@@ -129,24 +291,53 @@ print("Validation complete. NCC private path is working end-to-end.")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. Debug DNS (optional)
+# MAGIC ## 4b. Resolver experiment (optional)
 # MAGIC
-# MAGIC Run this cell only if a check above fails or a client reports an unresolved host.
-# MAGIC It does not affect the pass/fail result. To check a routing host, set `ROUTING_HOST`
-# MAGIC in `.env` and re-run `scripts/create-secret-scope.sh`. The cell then reads it from the
-# MAGIC `routing_host` secret.
+# MAGIC Neo4j support asked to test a resolver that maps every address to the instance host.
+# MAGIC That includes the first address from the URI and every routing-table entry. This cell
+# MAGIC builds its own driver, so it does not touch the driver from step 4 and it does not
+# MAGIC affect the pass/fail result. It makes one attempt with no retries and prints every
+# MAGIC resolver call, the outcome, and the time taken.
+# MAGIC
+# MAGIC Run it after step 4 to compare the two resolvers in one session. If step 4 failed,
+# MAGIC "Run all" stops there, so run this cell by hand. It needs steps 1 and 2 to have run.
 
 # COMMAND ----------
 
-debug_hosts = [host]
-if "routing_host" in SECRET_KEYS:
-    debug_hosts.append(dbutils.secrets.get(scope="neo4j", key="routing_host"))
+import time
 
-for debug_host in debug_hosts:
-    try:
-        debug_ip = socket.gethostbyname(debug_host)
-    except socket.gaierror as err:
-        print(f"{debug_host} -> UNRESOLVED ({err})")
-        continue
-    kind = "private" if ipaddress.ip_address(debug_ip).is_private else "PUBLIC"
-    print(f"{debug_host} -> {debug_ip} ({kind})")
+from neo4j import GraphDatabase
+from neo4j.exceptions import DriverError, Neo4jError
+
+
+def host_only_resolver(address):
+    print(f"resolver call: {address.host}:{address.port} -> {host}:{address.port}")
+    return [(host, address.port)]
+
+
+experiment_driver = GraphDatabase.driver(
+    NEO4J_URI,
+    auth=(NEO4J_USER, NEO4J_PASSWORD),
+    resolver=host_only_resolver,
+    connection_timeout=10,
+    max_connection_lifetime=300,
+)
+
+started = time.perf_counter()
+try:
+    experiment_driver.verify_connectivity()
+    print("verify_connectivity: OK")
+    with experiment_driver.session(database=NEO4J_DATABASE) as session:
+        experiment_count = session.execute_read(
+            lambda tx: tx.run("MATCH (n) RETURN count(n) AS c").single()["c"]
+        )
+    print(f"RESULT: connected, node count {experiment_count}")
+except (DriverError, Neo4jError, OSError, ValueError) as err:
+    print(f"RESULT: FAILED {type(err).__name__}: {err}")
+    cause = err.__cause__ or err.__context__
+    while cause is not None:
+        print(f"  caused by {type(cause).__name__}: {cause}")
+        cause = cause.__cause__ or cause.__context__
+finally:
+    print(f"elapsed: {time.perf_counter() - started:.2f}s")
+    experiment_driver.close()

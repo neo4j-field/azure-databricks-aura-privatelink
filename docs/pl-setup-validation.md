@@ -20,12 +20,16 @@ Expected: subscription `Business Development`, subnets `snet-pe` and `snet-vm`, 
 
 ## 1. Destroy the old private endpoint
 
-`destroy` needs `PE_RG` in `.env`. The first line adds a newline when `.env` does not end with one, so the appended setting does not join the previous line.
+`destroy` needs `PE_RG` in `.env`. Set it first:
 
 ```bash
-[ -n "$(tail -c1 .env)" ] && echo >> .env
-grep -q '^PE_RG=' .env || echo 'PE_RG="rg-aura-pl-test"' >> .env
-grep -E '^(PE_RG|VNET|VNET_RG)=' .env
+PE_RG="rg-aura-pl-test"
+```
+
+Then load it:
+
+```bash
+source scripts/load-env.sh
 ```
 
 ```bash
@@ -40,14 +44,19 @@ uv run scripts/private_link.py destroy
 
 ## 2. Create the VNet-injected workspace
 
-Add these three lines to `.env` first. The scripts and the later steps read them.
+Set these three variables in `.env` first. The scripts and the later steps read them.
 
 ```bash
-[ -n "$(tail -c1 .env)" ] && echo >> .env
-grep -q '^WORKSPACE_NAME=' .env || echo 'WORKSPACE_NAME="dbx-aura-pl-test"' >> .env
-grep -q '^WS_RG=' .env || echo 'WS_RG="rg-aura-pl-test"' >> .env
-grep -q '^PE_SUBNET=' .env || echo 'PE_SUBNET="snet-pe"' >> .env
-grep -E '^(VNET|VNET_RG|PE_RG|WORKSPACE_NAME|WS_RG|PE_SUBNET)=' .env
+WORKSPACE_NAME="dbx-aura-pl-test"
+WS_RG="rg-aura-pl-test"
+PE_SUBNET="snet-pe"
+```
+
+`WS_RG` is the resource group for the workspace. If you leave it unset, it defaults to `VNET_RG`.
+
+Then load them:
+
+```bash
 source scripts/load-env.sh
 ```
 
@@ -67,7 +76,7 @@ Check the result:
 az databricks workspace show -g "$WS_RG" -n "$WORKSPACE_NAME" --query "{state:provisioningState, url:workspaceUrl, vnet:parameters.customVirtualNetworkId.value}" -o json
 ```
 
-Expected: `state` is `Succeeded` and `vnet` ends in `vnet-consumer`.
+Expected: `state` is `Succeeded` and `vnet` ends in `vnet-consumer-eus2`.
 
 ## 3. Create a Databricks CLI profile for the new workspace
 

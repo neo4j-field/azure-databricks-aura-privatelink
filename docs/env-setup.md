@@ -152,7 +152,7 @@ The NCC calls go to `accounts.azuredatabricks.net`, which is a different auth co
 |----------|------------|------------------|
 | `DATABRICKS_ACCOUNT_ID` | The Databricks account ID. | Account console at `accounts.azuredatabricks.net`. Open the user menu in the top right corner. |
 | `ACCOUNT_PROFILE` | A Databricks CLI profile for the account. It must be an account-level profile, never a workspace profile, or the login fails with a host conflict. | Pick a name and create it as in [Create an account profile](#create-an-account-profile). |
-| `NCC_REGION` | The Azure region of the workspace. An NCC binds only to a workspace in its own region. | Run the command in [Read the workspace region](#read-the-workspace-region). The value looks like `eastus2`. |
+| `NCC_REGION` | The Azure region of the workspace, not the Aura region. An NCC binds only to a workspace in its own region. | Run the command in [Read the workspace region](#read-the-workspace-region). The value looks like `eastus2`. |
 
 ### Create an account profile
 

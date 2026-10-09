@@ -94,7 +94,8 @@ Neo4j Aura falls under **Resources behind a Standard Load Balancer**. This categ
 ## NCC: region considerations
 
 - The NCC region **must** match the Databricks workspace region. This is a hard constraint.
-- Put the Aura instance in the same Azure region as the workspace. Azure Private Link accepts private endpoints from any public region, but this repo has not tested an NCC rule to an Aura Private Link service in another region.
+- The Aura instance can be in a different Azure region from the workspace. This repo validated a workspace in `eastus2` reaching an Aura instance in `uksouth` through an NCC private endpoint rule. Notebook 01 resolved the instance host to a private address, connected over Bolt, and read data.
+- Use the same region for the workspace and the Aura instance when you can. It avoids the latency and egress cost below.
 - Cross-region traffic adds latency and a cross-region egress charge. See [NCC: cost model](#ncc-cost-model).
 
 ## NCC: failure modes and recovery

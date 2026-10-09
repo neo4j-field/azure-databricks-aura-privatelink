@@ -36,7 +36,7 @@ Every value in this guide lives in the repo-root `.env`. [Environment setup](env
 | Workspace plan | **Premium** |
 | Account plan | **Premium** |
 | Role | **Azure Databricks account admin**. Workspace admin is not sufficient. |
-| Region | Must match the NCC region |
+| Region | The NCC must be created in the workspace region. The Aura instance can be in a different region. |
 | Serverless compute | Enabled in the workspace (`Settings → Compute → Serverless`) |
 
 If you do not have a workspace yet, deploy an **Azure Databricks Workspace** on the **Premium** plan in your chosen region first.
@@ -194,7 +194,7 @@ The command waits for the workspace to return to `RUNNING`. Add `--no-wait` to r
 
 A private endpoint rule tells Databricks to open a private connection from its serverless network to the Aura Private Link service. The rule names that service by its alias and lists the Aura hostname. Serverless compute then resolves that hostname to the private endpoint instead of the public address, so Bolt traffic stays on the Azure backbone. The rule starts as `PENDING` and becomes usable after you approve the connection in Aura in [Step 4](#step-4-approve-the-endpoint-in-aura).
 
-> **Use the CLI, REST API, or Terraform, not the account console UI.** The console requires an Azure-native resource ID and subresource ID. Neo4j Aura is a **third-party Private Link service**, so the console flow does not apply.
+> **You can create the rule in the account console UI or with the script.** In the UI, click **Add private endpoint rule**. Enter the Aura Private Link service name (the PLS alias) in the **Azure resource ID** field, and enter the Aura hostname as the domain name. The field label says Azure resource ID, but the PLS alias is the value it needs. The steps below use the CLI, which sends the same two values. [`scripts/create-private-endpoint-rule.sh`](../scripts/create-private-endpoint-rule.sh) wraps that call.
 
 The CLI sends the PLS alias as `resource_id` and the hostnames as `domain_names`. Do not set `group_id`. It is for first-party Azure resources and cannot be combined with `domain_names`.
 
@@ -304,7 +304,9 @@ The notebooks install a driver resolver for the routing hosts, so they pass with
 
 ### Debug DNS (optional)
 
-Run the last cell of [ncc-notebooks/01_validate_connectivity.py](../ncc-notebooks/01_validate_connectivity.py) only if a notebook fails and you need to see which hostname is not resolving privately. The cell prints each host with its IP and labels it `private` or `PUBLIC`. It prints `UNRESOLVED` when the lookup fails. It does not affect the pass or fail result of the notebook.
+Run the first code cell, Debug DNS, of [ncc-notebooks/01_validate_connectivity.py](../ncc-notebooks/01_validate_connectivity.py) only if a notebook fails and you need to see which hostname is not resolving privately. The cell prints an environment block, then four checks. It resolves each host and labels it `private` or `PUBLIC`, with the resolver error code when the lookup fails. It resolves control hosts, queries DNS directly with `dnspython`, and tests TCP to a public IP. It does not affect the pass or fail result of the notebook.
+
+Check 3 needs `dnspython`, which the install cell adds. Run the cell once, and run it again after the install cell has finished to get check 3. For the Databricks CLI checks of the NCC itself, see [TROUBLESHOOTING.md](../TROUBLESHOOTING.md).
 
 The cell always checks the instance host from the `uri` secret. To check a routing hostname too, add `ROUTING_HOST` to `.env` and run `./scripts/create-secret-scope.sh` again. The script stores it as the `routing_host` secret, and the cell reads it from there. The `.env` value is the full `p-<aura-instance-id>-<suffix>.<orch>.neo4j.io` hostname named in a client's error.
 
